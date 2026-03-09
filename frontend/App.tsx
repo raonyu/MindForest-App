@@ -21,6 +21,7 @@ function App(){
     <View>
       <Text style={styles.bigfont}>마음의 숲 프로젝트</Text>
       <CustomButton></CustomButton>
+      <CustomButton></CustomButton>
     </View>
   );
 };
