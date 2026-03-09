@@ -209,3 +209,6 @@ __marimo__/
 
 # Frontend_add
 node_modules/
+.bundles/
+frontend/node_modules/
+backend/node_modules/
