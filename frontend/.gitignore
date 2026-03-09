@@ -81,6 +81,7 @@ yarn-error.log
 
 # Dependency directories
 node_modules/
+.bundles/
 
 # Android build files
 android/app/build/
