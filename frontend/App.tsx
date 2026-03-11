@@ -11,7 +11,13 @@ import {createMaterialTopTabNavigator} from '@react-navigation/material-top-tabs
 
 //각 화면 컴포넌트들(달력, 매인, 채팅) 
 const ChatScreen = () => (
-  <View><Text>채팅 화면이 뜰겁니다</Text></View>
+  <View>
+    <Text>채팅 화면이 뜰겁니다</Text>
+  
+  
+  
+  
+  </View>
 );
 const MainScreen = () => (
   <View><Text>여기는 메인화면입니다</Text></View>
@@ -33,7 +39,11 @@ function App(){
 
   return (
     <NavigationContainer>
-      <Tab.Navigator initialRouteName = "MainScreen">
+      <Tab.Navigator initialRouteName = "마음의 숲"
+                     screenOptions={{tabBarStyle: styles.tabBar,
+                                    tabBarLabelStyle: {fontSize: 20, fontWeight: 'bold', color: 'white'},
+                                    tabBarIndicatorStyle: {backgroundColor: 'white', height: 3},
+                                    }}>     
         <Tab.Screen name="감정일기" component={DiaryScreen} />
         <Tab.Screen name="마음의 숲" component={MainScreen} />
         <Tab.Screen name="채팅" component={ChatScreen} />
@@ -52,7 +62,10 @@ const styles = StyleSheet.create({
   },
   baseButton: {
     backgroundColor: "gray",
-  }
+  },
+tabBar: {
+    backgroundColor: 'green',
+  }   
 });
 
 
