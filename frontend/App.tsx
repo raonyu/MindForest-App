@@ -4,18 +4,53 @@
  *
  * @format
  */
-import React from 'react';
+import React, { useEffect } from 'react';
 import {useState} from 'react';
 import { StatusBar, StyleSheet, useColorScheme, View, Text, Pressable, TouchableOpacity, FlatList, ListRenderItem} from 'react-native';
 import {NavigationContainer} from '@react-navigation/native';//네비게이션 라이브러리 불러오기
 import {createMaterialTopTabNavigator} from '@react-navigation/material-top-tabs';
+import {BottomBarProvider, useBottomBar} from './BottomBarContext';
+import { useIsFocused } from '@react-navigation/native';
+
+//하단바 컨텍스트 생성
+const BottomBar = () => {
+  const { BottomBar:content } = useBottomBar();
+  if (!content) return null;
+  return (
+  <View style={styles.bottomBar}>
+    {content}
+  </View>
+  );
+};
+
+
+
+
 //각 화면 컴포넌트 불러오기
 import ChatScreen from './ChatScreen';
 
 
-const MainScreen = () => (
-  <View><Text>여기는 메인화면입니다</Text></View>
-);
+const MainScreen = () => {
+  const isFocused = useIsFocused();//현재 화면이 포커스 되어있는지 확인
+  const { setBottomBarContent } = useBottomBar();
+  useEffect(() => {
+    if(isFocused){
+    setBottomBarContent(
+      <View>
+        <Text>메인화면임</Text>
+      </View>
+    );
+    //다른 화면으로 전환 시 하단바 초기화
+    return () => setBottomBarContent(null);
+    } 
+  }, [isFocused]);
+
+
+
+
+
+  return (<View><Text>여기는 메인화면입니다</Text></View>)
+};
 const DiaryScreen = () => (
   <View><Text>감정일기 달력 화면</Text></View>
 );
@@ -30,6 +65,7 @@ function App(){
   const isDarkMode = useColorScheme() === 'dark';
 
   return (
+    <BottomBarProvider>
     <View style={styles.container}>
       <NavigationContainer>
         <Tab.Navigator initialRouteName = "마음의 숲"
@@ -41,11 +77,10 @@ function App(){
           <Tab.Screen name="마음의 숲" component={MainScreen} />
           <Tab.Screen name="채팅" component={ChatScreen} />
         </Tab.Navigator>
-        <View style={styles.bottomBar}>
-          <Text style={styles.bottomBarText}>커스텀텍스트</Text>
-        </View>
+          <BottomBar/>
       </NavigationContainer>
     </View>
+    </BottomBarProvider>
   );
 };
 

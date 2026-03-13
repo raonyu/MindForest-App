@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {useState} from 'react';
-import {StyleSheet,View, Text, FlatList, ListRenderItem} from 'react-native';
-
+import {StyleSheet,View, Text, Button, TextInput ,FlatList, ListRenderItem} from 'react-native';
+import {BottomBarProvider, useBottomBar} from './BottomBarContext';
+import { useIsFocused } from '@react-navigation/native';
 
 //메세지 구조 잡기
 interface Message {
@@ -22,6 +23,37 @@ const MOCK_MESSAGES: Message[] = [
 const ChatScreen = () => {
   const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
   const [inputText, setInputText] = useState<string>('');
+  const isFocused = useIsFocused();//현재 화면이 포커스 되어있는지 확인
+
+  //하단바 채팅 입력창 생성
+  const { setBottomBarContent } = useBottomBar();
+  useEffect(() => {
+    if(isFocused){
+    setBottomBarContent(
+      <View style={{flexDirection: 'row'}}>
+        <TextInput
+        value={inputText}
+        onChangeText={setInputText}
+        placeholder="채팅메세지"
+        />
+        <Button title="전송" onPress={() => {
+          if (inputText.trim()) {
+            const newMessage: Message = {
+              id: Date.now().toString(),
+              text: inputText,
+              sender: 'user',
+              time: new Date().toLocaleTimeString()
+            };
+            setMessages([...messages, newMessage]);
+            setInputText('');
+          }
+        }} />
+      </View>
+    );
+    //다른 화면으로 전환 시 하단바 초기화
+    return () => setBottomBarContent(null);
+    } 
+  }, [isFocused, inputText]);
 
   //메세지 렌더링 컴포넌트
   const renderMessages: ListRenderItem<Message> = ({item}: {item: Message}) => (
