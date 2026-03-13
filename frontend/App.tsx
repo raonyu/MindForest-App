@@ -30,23 +30,28 @@ function App(){
   const isDarkMode = useColorScheme() === 'dark';
 
   return (
-    <NavigationContainer>
-      <Tab.Navigator initialRouteName = "마음의 숲"
-                     screenOptions={{tabBarStyle: styles.tabBar,
-                                    tabBarLabelStyle: {fontSize: 20, fontWeight: 'bold', color: 'white'},
-                                    tabBarIndicatorStyle: {backgroundColor: 'white', height: 3},
-                                    }}>     
-        <Tab.Screen name="감정일기" component={DiaryScreen} />
-        <Tab.Screen name="마음의 숲" component={MainScreen} />
-        <Tab.Screen name="채팅" component={ChatScreen} />
-      </Tab.Navigator>
-    </NavigationContainer>
+    <View style={styles.container}>
+      <NavigationContainer>
+        <Tab.Navigator initialRouteName = "마음의 숲"
+                      screenOptions={{tabBarStyle: styles.tabBar,
+                                      tabBarLabelStyle: {fontSize: 20, fontWeight: 'bold', color: 'white'},
+                                      tabBarIndicatorStyle: {backgroundColor: 'white', height: 3},
+                                      }}>     
+          <Tab.Screen name="감정일기" component={DiaryScreen} />
+          <Tab.Screen name="마음의 숲" component={MainScreen} />
+          <Tab.Screen name="채팅" component={ChatScreen} />
+        </Tab.Navigator>
+        <View style={styles.bottomBar}>
+          <Text style={styles.bottomBarText}>커스텀텍스트</Text>
+        </View>
+      </NavigationContainer>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flex: 1
   },
   bigfont: {
     fontSize: 32,
@@ -57,7 +62,19 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     backgroundColor: 'green',
-  }   
+  },
+  bottomBar:{
+    backgroundColor: 'blue',
+    height: 68,
+    justifyContent: 'center',
+    paddingHorizontal: 20
+  },
+  bottomBarText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold'
+  }
+
 });
 
 
