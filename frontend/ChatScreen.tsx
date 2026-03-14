@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import {useState} from 'react';
 import {StyleSheet,View, Text, Button, TextInput ,FlatList, ListRenderItem} from 'react-native';
 import {BottomBarProvider, useBottomBar} from './BottomBarContext';
+import ChatInput from './ChatInput';
 import { useIsFocused } from '@react-navigation/native';
 
 //메세지 구조 잡기
@@ -29,31 +30,17 @@ const ChatScreen = () => {
   const { setBottomBarContent } = useBottomBar();
   useEffect(() => {
     if(isFocused){
-    setBottomBarContent(
-      <View style={{flexDirection: 'row'}}>
-        <TextInput
-        value={inputText}
-        onChangeText={setInputText}
-        placeholder="채팅메세지"
+      setBottomBarContent(
+        <ChatInput
+        onSend={(inputText) => {
+        console.log("전송된 텍스트:", inputText);
+        }}
         />
-        <Button title="전송" onPress={() => {
-          if (inputText.trim()) {
-            const newMessage: Message = {
-              id: Date.now().toString(),
-              text: inputText,
-              sender: 'user',
-              time: new Date().toLocaleTimeString()
-            };
-            setMessages([...messages, newMessage]);
-            setInputText('');
-          }
-        }} />
-      </View>
-    );
-    //다른 화면으로 전환 시 하단바 초기화
-    return () => setBottomBarContent(null);
-    } 
-  }, [isFocused, inputText]);
+      );
+      //다른 화면으로 전환 시 하단바 초기화
+      return () => setBottomBarContent(null);
+    }
+  }, [isFocused]);
 
   //메세지 렌더링 컴포넌트
   const renderMessages: ListRenderItem<Message> = ({item}: {item: Message}) => (
