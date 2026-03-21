@@ -34,22 +34,25 @@ const MainScreen = () => {
   const isFocused = useIsFocused();//현재 화면이 포커스 되어있는지 확인
   const { setBottomBarContent } = useBottomBar();
   useEffect(() => {
+    //하단바 설정
     if(isFocused){
-    setBottomBarContent(
-      <View>
-        <Text>메인화면임</Text>
-      </View>
+      setBottomBarContent(
+        <View>
+          <Text>메인화면임</Text>
+        </View>
     );
     //다른 화면으로 전환 시 하단바 초기화
     return () => setBottomBarContent(null);
     } 
   }, [isFocused]);
-
-
-
-
-
-  return (<View><Text>여기는 메인화면입니다</Text></View>)
+  //메인 화면 내용
+  return (
+  <View>
+    <Text>여기는 메인화면입니다</Text>
+    <TouchableOpacity style={{height: 50, backgroundColor: 'gray', justifyContent: 'center', alignItems: 'center', marginTop: 20, borderRadius: 10  }}>
+      <Text style={{color: 'white'}}>마음의 숲 사전 테스트 시작하기</Text>
+    </TouchableOpacity>
+  </View>)
 };
 const DiaryScreen = () => (
   <View><Text>감정일기 달력 화면</Text></View>

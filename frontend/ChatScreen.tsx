@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useReducer } from 'react';
 import {useState} from 'react';
-import {StyleSheet,View, Text, Button, TextInput ,FlatList, ListRenderItem} from 'react-native';
+import {StyleSheet,View, Text, Button, TextInput ,FlatList, ListRenderItem, Image} from 'react-native';
 import {BottomBarProvider, useBottomBar} from './BottomBarContext';
 import ChatInput from './ChatInput';
 import SurveyInput from './SurveyInput';
@@ -48,7 +48,6 @@ const ChatScreen = () => {
     };
     setMessages(prevMessages => [...prevMessages, newMessage]);
   };
-
   //하단바 채팅 입력창 생성
   const { setBottomBarContent } = useBottomBar();
   useEffect(() => {
@@ -63,7 +62,7 @@ const ChatScreen = () => {
           options={surveyData.detail}
           onSelect={(value) => {sendMessages(value);}}/>
         )
-      }else{
+      }else{//그 이외에는 일반 채팅을 보여줌
         setBottomBarContent(
           <ChatInput
           onSend={(inputText) => {sendMessages(inputText);
@@ -74,14 +73,20 @@ const ChatScreen = () => {
       //다른 화면으로 전환 시 하단바 초기화
       return () => setBottomBarContent(null);
     }
-  }, [isFocused, messages]);
+  }, [isFocused, messages]);//포커싱, 메세지 데이터 여부에 따라 재랜더링
 
   
   //메세지 렌더링 컴포넌트
   const renderMessages: ListRenderItem<Message> = ({item}: {item: Message}) => (
-    <View style={[styles.messageBubble, item.sender === 'user' ? styles.userBubble : styles.otherBubble]}>
-      <Text style={styles.messageText}>{item.text}</Text>
-      <Text>{item.time}</Text>
+    <View>
+      <View style={[item.sender === 'user' ? styles.userChatting : styles.otherChatting]}>
+        {item.sender === 'ai' && <Image source={require('./assets/profile_icon.png')} style = {styles.otherProfileImage}/>}
+        {item.sender === 'user' && <Image source={require('./assets/profile_icon.png')} style = {styles.userProfileImage}/>}
+      </View>
+      <View style={[styles.messageBubble, item.sender === 'user' ? styles.userBubble : styles.otherBubble]}>
+        <Text style={styles.messageText}>{item.text}</Text>
+        <Text>{item.time}</Text>
+      </View>
     </View>
   );
 
@@ -109,9 +114,25 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: 'white'
     },
+    userChatting: {
+        flexDirection: 'row',
+    },
+    userProfileImage: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+    },
     userBubble: {
         alignSelf: 'flex-start',
         backgroundColor: '#84E291'
+    },
+    otherChatting: {
+        flexDirection: 'row-reverse',
+    },
+    otherProfileImage: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
     },
     otherBubble: {
         alignSelf: 'flex-end',
