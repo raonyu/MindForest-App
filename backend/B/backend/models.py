@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, Boolean, Float
 from database import Base
 from datetime import datetime, timezone
 from sqlalchemy.orm import relationship
@@ -11,9 +11,13 @@ class User(Base):
     email = Column(String, unique=True)
     password = Column(String)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    
+    # 관계 설정
     diaries = relationship("Diary", back_populates="author")
     survey_results = relationship("SurveyResult", back_populates="user")
     chat_histories = relationship("ChatHistory", back_populates="user")
+   
+    # 온보딩 상태
     is_onboarding_done = Column(Boolean, default=False)
     user_animal = Column(String, nullable=True)
 
@@ -24,20 +28,25 @@ class Diary(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, ForeignKey("users.id"))
     content = Column(Text)
+
+    # 루틴 데이터
+    routine_name = Column(String, nullable=True)
+    is_done = Column(Boolean, default=False)
+
+    joy = Column(Float, default=0.0)
+    sadness = Column(Float, default=0.0)
+    anger = Column(Float, default=0.0)
+    fear = Column(Float, default=0.0)
+    trust = Column(Float, default=0.0)
+    disgust = Column(Float, default=0.0)
+    surprise = Column(Float, default=0.0)
+    anticipation = Column(Float, default=0.0)
+
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-
-    joy = Column(Integer)
-    trust = Column(Integer)
-    fear = Column(Integer)
-    surprise = Column(Integer)
-    sadness = Column(Integer)
-    disgust = Column(Integer)
-    anger = Column(Integer)
-    anticipation = Column(Integer)
-
     analysis_comment = Column(String)
-
+    
     author = relationship("User", back_populates="diaries")
+    analysis_data = relationship("Analysis", back_populates="diary", uselist=False)
 
 
 class Analysis(Base):
@@ -46,9 +55,10 @@ class Analysis(Base):
     id = Column(Integer, primary_key=True, index=True)
     diary_id = Column(Integer, ForeignKey("diaries.id"))
     emotion = Column(String)
-    score = Column(Integer)
+    score = Column(Float, default=0.0)
     feedback = Column(Text)
 
+    diary = relationship("Diary", back_populates="analysis_data")
 
 class Survey(Base):
     __tablename__ = "surveys"
