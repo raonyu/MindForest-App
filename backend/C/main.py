@@ -1,51 +1,48 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
 from typing import List
-import models  # 담당 B가 만든 DB 모델 연동
+import models  # 담당 B의 DB 모델 연동
+from database import engine, get_db  # 담당 B의 DB 설정 및 세션 연동
+from analysis import get_mind_forest_report  # 예영이가 완성한 12지표 분석 로직
 
-app = FastAPI()
+# 서버 기동 시 DB 테이블 자동 생성 (B파트 연동 확인)
+models.Base.metadata.create_all(bind=engine)
 
-# 9유형 진단 가중치 데이터 (아까 우리가 정한 20문항 로직)
-# 예시로 몇 개만 넣었으니, 팀에서 정한 전체 로직을 이 형식대로 채우면 돼!
-WEIGHTS = {
-    1: {1: {"A": 1, "C": 1}, 2: {"H": 2, "B": 1}},
-    2: {1: {"B": 2, "E": 1}, 2: {"D": 1, "I": 2}},
-    3: {1: {"G": 2}, 2: {"F": 1, "A": 1}},
-    # ... 20번 문항까지 같은 방식으로 추가
-}
+app = FastAPI(
+    title="마음의 숲(MindForest) 분석 API - 담당 C 김예영",
+    description="사용자의 8대 감정 데이터를 분석하여 12가지 심리 지표를 제공합니다."
+)
 
-@app.post("/test/diagnose")
-def diagnose_user(answers: List[int]):
+@app.get("/api/analysis/report/{user_id}")
+def generate_report(user_id: str, db: Session = Depends(get_db)):
     """
-    사용자가 선택한 답변 리스트(예: [1, 2, 1, ...])를 받아
-    가중치를 합산하여 최종 심리 유형을 반환합니다.
+    [1~12번 지표 통합 리포트 생성 엔드포인트]
+    담당 A(프론트)가 호출하면 14일간의 데이터를 분석하여 12가지 지표를 반환합니다.
     """
-    # 점수 초기화 (A~I 유형)
-    scores = {k: 0 for k in "ABCDEFGHI"}
-    
-    # 답변 리스트를 돌면서 가중치 합산
-    for i, ans in enumerate(answers):
-        q_num = i + 1  # 문항 번호 (1부터 시작)
-        if q_num in WEIGHTS and ans in WEIGHTS[q_num]:
-            for type_key, weight in WEIGHTS[q_num][ans].items():
-                scores[type_key] += weight
-    
-    # 가장 높은 점수를 받은 유형 결정
-    final_type = max(scores, key=scores.get)
-    
-    # 유형별 캐릭터 매핑 (예시)
-    characters = {
-        "A": "움츠린 거북이",
-        "H": "까칠한 햄스터",
-        "I": "산만한 다람쥐"
-    }
-    
-    return {
-        "final_type": final_type,
-        "character_name": characters.get(final_type, "미확인 유형"),
-        "all_scores": scores,
-        "message": "성격 유형 진단이 완료되었습니다."
-    }
+    try:
+        # 담당 C의 분석 엔진 실행
+        report_data = get_mind_forest_report(db, user_id)
+        
+        # 데이터가 아예 없는 경우(Error 반환 시) 처리
+        if "error" in report_data:
+            raise HTTPException(status_code=404, detail=report_data["error"])
+            
+        return report_data
 
-@app.get("/health")
+    except Exception as e:
+        # 서버 내부 로직 오류 발생 시 방어 코드
+        raise HTTPException(status_code=500, detail=f"분석 엔진 구동 실패: {str(e)}")
+
+@app.get("/api/analysis/check")
 def health_check():
-    return {"status": "ok", "message": "담당 C 서버 정상 작동 중"}
+    """서버 연결 상태 및 담당자 확인용"""
+    return {
+        "status": "ready",
+        "developer": "Kim Ye-young",
+        "target": "University of Ulsan Team Project"
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    # uvicorn main:app --reload 명령어로 실행 가능
+    uvicorn.run(app, host="0.0.0.0", port=8000)
