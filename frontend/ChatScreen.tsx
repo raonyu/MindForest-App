@@ -1,12 +1,13 @@
 import React, { useEffect, useReducer } from 'react';
 import {useState} from 'react';
-import {StyleSheet,View, Text, Button, TextInput ,FlatList, ListRenderItem, Image} from 'react-native';
+import {StyleSheet,View, Text, Button, TextInput ,FlatList, ListRenderItem, Image,} from 'react-native';
 import {BottomBarProvider, useBottomBar} from './BottomBarContext';
 import ChatInput from './ChatInput';
 import SurveyInput from './SurveyInput';
 import { useIsFocused } from '@react-navigation/native';
 import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import { COLORS } from './assets/Maincolors';
+
 
 //메세지 구조 잡기
 interface Message {
@@ -21,17 +22,46 @@ const MOCK_MESSAGES: Message[] = [
     {id: '1', text: "상대방 매세지", sender: 'ai', time: '오전 10:00'},
     {id: '2', text: "나의 메세지", sender: 'user', time: '오전 11:00'},
     //{id: '3', text: `{"type": "select", "title": "질문 내용", "detail": ["옵션1", "옵션2", "옵션3"]}`, sender: 'ai', time: '오전 12:00'},
-    {id: '4', text: `{"type": "select", "title": "1. 아침에 눈을 떴을 때, 오늘 하루의 일정이 꽉 차 있다면?", "detail": ["① 벌써 기가 빨려... 이불 속으로 다시 들어가고 싶다. ", "② 시간 단위로 쪼개야 해! 머릿속으로 완벽한 시뮬레이션을 돌린다.", "③ 일단 부딪혀! 막상 나가면 어떻게든 흘러가겠지 생각한다."]}`, sender: 'ai', time: '오전 12:00'}
+    //{id: '4', text: `{"type": "select", "title": "1. 아침에 눈을 떴을 때, 오늘 하루의 일정이 꽉 차 있다면?", "detail": ["① 벌써 기가 빨려... 이불 속으로 다시 들어가고 싶다. ", "② 시간 단위로 쪼개야 해! 머릿속으로 완벽한 시뮬레이션을 돌린다.", "③ 일단 부딪혀! 막상 나가면 어떻게든 흘러가겠지 생각한다."]}`, sender: 'ai', time: '오전 12:00'}
 ];
 
 
-
-
-//각 화면 컴포넌트들(달력, 매인, 채팅) 
+//채팅 화면 컴포넌트
 const ChatScreen = () => {
+  const isFocused = useIsFocused();//현재 화면이 포커스 되어있는지 확인
   const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
   const [inputText, setInputText] = useState<string>('');
-  const isFocused = useIsFocused();//현재 화면이 포커스 되어있는지 확인
+
+
+  //백앤드 메세지 요청/응답 함수
+  const handleSendMessage = async (inputText: string) => {
+    //유저 메세지 보내기
+    const userMsg: Message = {
+      id: (MOCK_MESSAGES.length + 1).toString(),
+      text: inputText,
+      sender: 'user',
+      time: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}),
+    }
+    setMessages(prev => [...prev, userMsg]);
+    try{
+      const response = await fetch('http://127.0.0.1:8000/docs', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({message: inputText, history: messages}),
+      });
+       
+      //ai 응답 후 메세지 보내는 함수
+      const aiResponse = await response.json();
+      const aimag: Message = {
+        id: (MOCK_MESSAGES.length + 1).toString(),
+        text: aiResponse.message,
+        sender: 'ai',
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}),
+      };
+      setMessages(prev => [...prev, aimag]);
+    }catch (error){console.error('응답 실패', error);}
+  } 
+
 
   //메세지 보내는 함수(메세지 데이터들에서 추가하는거)
   const sendMessages = (inputText: string) => {
@@ -59,10 +89,6 @@ const ChatScreen = () => {
       return null;
   };
 
-
-
-
-
   //하단바 채팅 입력창 생성
   const { setBottomBarContent } = useBottomBar();
   useEffect(() => {
@@ -78,7 +104,7 @@ const ChatScreen = () => {
       }else{//그 이외에는 일반 채팅을 보여줌
         setBottomBarContent(
           <ChatInput
-          onSend={(inputText) => {sendMessages(inputText);
+          onSend={(inputText) => {handleSendMessage(inputText);
           }}
           />
         );
