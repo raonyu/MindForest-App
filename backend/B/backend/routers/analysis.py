@@ -7,60 +7,76 @@ from services.ai_logic import check_anomaly_level
 
 router = APIRouter()
 
-ANIMAL_MAP = {
-    "조용히 숨 고르는 거북이": "A",
-    "볼이 빵빵한 화난 햄스터": "H",
-    "도토리 찾는 꼬마 다람쥐": "I",
-    # ... 나머지 동물들도 추가
-}
-
-# 1. 특정 일기의 상세 분석 결과 조회
+# --- [STEP 1] 특정 일기의 상세 분석 결과 조회 ---
 @router.get("/api/analysis/{diary_id}")
 def get_analysis(diary_id: int, db: Session = Depends(get_db)):
-    # models.Analysis 대신 Diary 테이블에서 바로 가져오는 것이 효율적일 수 있습니다.
-    result = db.query(models.Diary).filter(models.Diary.id == diary_id).first()
+    """
+    일기 작성 직후 또는 과거 기록 확인 시, 8종 감정 수치와 AI 코멘트를 반환합니다.
+    """
+    diary = db.query(models.Diary).filter(models.Diary.id == diary_id).first()
     
-    if not result:
+    if not diary:
         raise HTTPException(status_code=404, detail="분석 결과를 찾을 수 없습니다.")
         
     return {
-        "diary_id": result.id,
+        "diary_id": diary.id,
+        "content": diary.content,
         "emotions": {
-            "joy": result.joy, "sadness": result.sadness, # ... 나머지 감정들
+            "joy": diary.joy,
+            "sadness": diary.sadness,
+            "anger": diary.anger,
+            "fear": diary.fear,
+            "trust": diary.trust,
+            "disgust": diary.disgust,
+            "surprise": diary.surprise,
+            "anticipation": diary.anticipation
         },
-        "comment": result.analysis_comment
+        "comment": diary.analysis_comment,
+        "created_at": diary.created_at
     }
 
-# 2. 사용자별 이상징후 알림 상태 조회 (메인 기능)
+# --- [STEP 2] 사용자별 실시간 이상징후 알림 상태 조회 ---
 @router.get("/api/emotion-alert/{user_id}")
 def emotion_alert(user_id: str, db: Session = Depends(get_db)):
-    # [Step 1] 서비스 함수 호출 (B가 만든 로직)
-    # 주의: get_recent_emotions 함수가 db 세션을 인자로 받도록 수정되어야 합니다.
+    """
+    메인 화면 진입 시 사용자의 최근 7일 감정 흐름을 분석하여 경고 레벨을 알려줍니다.
+    """
+    # 1. 최근 감정 데이터 추출 (B의 서비스 로직 호출)
     recent_data = get_recent_emotions(user_id, db) 
 
     if not recent_data:
-        return {"level": "LOW", "message": "최근 분석 데이터가 충분하지 않습니다."}
+        return {
+            "level": "LOW", 
+            "message": "아직 분석할 데이터가 부족해요. 일기를 써서 마음을 기록해보세요!"
+        }
 
-    # [Step 2] 이상징후 판정 (A가 만든 로직)
+    # 2. 이상징후 판정 (A의 AI 로직 호출)
     result = check_anomaly_level(recent_data)
 
     return result
 
+# --- [STEP 3] 주간 리포트 및 맞춤형 추천 조회 ---
 @router.get("/api/report/{user_id}")
 def get_report(user_id: str, db: Session = Depends(get_db)):
+    """
+    [담당 C 협업] 지난주 대비 변화율과 질환 카테고리별 맞춤 추천을 반환합니다.
+    """
     user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
     
-    # 1. C의 get_weekly_report 호출 (C의 요구대로 db 세션을 그대로 전달)
+    # 1. C의 주간 성장률/반등지수 로직 호출
     report_res = analysis_C.get_weekly_report(db, user_id)
     
-    # 2. C의 get_personalized_recommendation 호출을 위한 매핑 (B의 센스!)
-    full_name = user.user_animal if user else ""
-    short_type = ANIMAL_MAP.get(full_name, "Unknown") # 풀네임을 A, H 등으로 변환
-    
-    recommendation = analysis_C.get_personalized_recommendation(short_type)
+    # 2. C의 맞춤형 추천 로직 호출 (B의 필드 연동)
+    # [수정] 이제 ANIMAL_MAP 없이 DB에 저장된 assigned_category를 바로 사용합니다.
+    category = user.assigned_category if user.assigned_category else "DEPRESSION"
+    recommendation = analysis_C.get_personalized_recommendation(category)
 
     return {
-        "analysis": report_res,
-        "recommendation": recommendation,
-        "user_animal": full_name
+        "user_id": user_id,
+        "user_animal": user.user_animal, # 예: "정리대장 펭귄"
+        "assigned_category": category,    # 예: "OCD"
+        "weekly_analysis": report_res,
+        "recommendation": recommendation
     }
