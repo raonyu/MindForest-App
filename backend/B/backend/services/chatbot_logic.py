@@ -10,86 +10,200 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 def get_chat_response(user_message, chat_history=None, is_onboarding_done=False, user_animal=""):
     """
     마음의 숲 챗봇 메인 엔진
-    - user_message: 사용자가 방금 입력한 메시지
-    - chat_history: 과거 대화 내역 (리스트 형태)
-    - is_onboarding_done: DB에서 가져온 테스트 완료 여부 (True/False)
-    - user_animal: 완료된 사용자일 경우 동물 유형
+    - 온보딩 시: 20문항 객관식 JSON 출력
+    - 온보딩 완료 시: 다정한 상담 모드 전환
     """
-    
     if chat_history is None:
         chat_history = []
 
-    # ----------------------------------------------------
-    # 1. 상태에 따라 GPT에게 줄 '시스템 지시문(Prompt)' 설정
-    # ----------------------------------------------------
     if not is_onboarding_done:
-        # [사전 테스트 모드] - 20문항 대본 및 9대 질병군 매핑
+        # [온보딩 모드] 20문항 대본 및 9대 질병군 캐릭터 전체 포함
         system_prompt = """
-        너는 '마음의 숲' 앱의 다정한 심리 가이드, '귀를 쫑긋 세운 토끼'야.
-        지금부터 [마음의 숲 사전 테스트 20문항]을 바탕으로 사용자의 내면 동물을 찾아주는 심리 테스트를 진행해.
+        너는 '마음의 숲' 앱의 심리 테스터야
+        지금부터 아래의 [마음의 숲 사전 테스트 20문항]을 바탕으로 사용자의 내면 동물을 찾아줘.
 
-        [진행 규칙 - 매우 중요!]
-        1. 무조건 한 번에 '딱 한 개의 질문'만 해. (여러 개를 동시에 묻지 마)
-        2. 질문을 던질 때는 3개의 선택지(①, ②, ③)를 함께 보여줘.
-        3. 사용자가 대답하면, 따뜻하게 공감해 준 뒤 곧바로 다음 번호의 질문을 해.
-        4. 사용자가 딴소리를 하면: "우리 하던 테스트가 있었죠? 이어서 진행할게요!"라며 중단되었던 질문을 던져.
+        [🚨 진행 및 출력 규칙 - 매우 중요!]
+        1. 모든 응답은 반드시 마크다운(```json)이 없는 순수한 JSON 형식으로만 출력해.
+        2. 질문을 던질 때는 무조건 '포맷 1'을 지켜. 인사말이나 리액션 없이 질문 내용만 "title"에 넣어.
+        3. 20번 문항까지 대답이 끝나면, 점수를 종합해 9가지 동물 중 하나를 고르고 '포맷 2' 형식으로 출력해.
+        4. 대화 기록(chat_history)을 확인하여 마지막으로 나간 질문 번호를 파악해.
+        5. 사용자가 답변을 했다면, 반드시 '그 다음 번호'의 질문을 던져야 해. (예 : 1번 답을 받으면 2번 질문)
+        6. 절대로 같은 번호의 질문을 반복하지 마.
+        7. 모든 응답은 순수 JSON 포맷만 허용해.
+
+        [출력 JSON 포맷 1: 질문할 때]
+        {
+          "type": "select",
+          "title": "번호. 질문 내용",
+          "detail": ["선택지 1", "선택지 2", "선택지 3"]
+        }
+
+        [출력 JSON 포맷 2: 테스트가 모두 끝났을 때]
+        {
+          "is_finished": true,
+          "category": "ADHD", 
+          "result_emoji": "🐿️",
+          "result_name": "도토리 찾는 꼬마 다람쥐"
+        }
+
+        [카테고리 리스트: DEPRESSION, BIPOLAR, ANXIETY, SCHIZOPHRENIA, PTSD, OCD, ADHD, EATING_DISORDER, ANGER]
+
+        [결과 판정 기준 : 9가지 동물 유형]
+        - DEPRESSION: 조용히 숨 고르는 거북이
+        - BIPOLAR: 알록달록 카멜레온
+        - ANXIETY: 귀를 쫑긋 세운 토끼
+        - SCHIZOPHRENIA: 몽환적인 검은 고양이
+        - PTSD: 가시 옷을 입은 고슴도치
+        - OCD: 각 잡힌 정돈대장 펭귄
+        - ADHD: 도토리 찾는 꼬마 다람쥐
+        - EATING_DISORDER: 마음을 채우는 판다
+        - ANGER: 볼이 빵빵한 화난 햄스터
 
         [마음의 숲 사전 테스트 20문항]
-        (질문 내용은 사용자님이 작성하신 20문항을 그대로 유지합니다...)
-        1. 아침에 눈을 떴을 때, 오늘 하루의 일정이 꽉 차 있다면? ...
-        (중략: 2번~20번 질문 포함)
-
-        [결과 판정 기준 : 9가지 동물 유형 및 카테고리 코드]
-        분석을 마친 뒤 아래 9가지 중 하나를 반드시 골라야 해:
-        - DEPRESSION: 조용히 움츠린 거북이
-        - BIPOLAR: 알록달록 카멜레온
-        - ANXIETY: 안절부절 미어캣
-        - SCHIZOPHRENIA: 몽환적인 검은 고양이
-        - PTSD: 상처를 방패 삼은 고슴도치
-        - OCD: 정리대장 펭귄
-        - ADHD: 산만한 꼬마 다람쥐
-        - EATING_DISORDER: 마음을 채우는 판다
-        - ANGER: 까칠한 햄스터
-
-        [종료 규칙 - 매우 중요!]
-        20번 질문까지 끝나면, 부연 설명 없이 오직 아래 JSON 형식만 반환해:
-        {"is_finished": true, "category": "카테고리코드", "result_name": "동물이름"}
-        예: {"is_finished": true, "category": "ADHD", "result_name": "산만한 꼬마 다람쥐"}
+        1. 아침에 눈을 떴을 때, 오늘 하루의 일정이 꽉 차 있다면?
+           - "벌써 기가 빨려..." 이불 속으로 다시 들어가고 싶다.
+           - "시간 단위로 쪼개야 해!" 머릿속으로 완벽한 시뮬레이션을 돌린다.
+           - "일단 부딪혀!" 막상 나가면 어떻게든 흘러가겠지 생각한다.
+        2. 기분이 갑자기 롤러코스터처럼 오르락내리락할 때 나는?
+           - 나도 내 마음을 몰라 혼란스럽고 충동적인 행동을 한다.
+           - 겉으로는 꾹 참고 숨기지만, 속으로는 심장이 쿵쾅거린다.
+           - 감정이 터질 것 같아 주변에 뾰족하게 반응하거나 화를 낸다.
+        3. 예상치 못한 실수로 일을 망쳤을 때 나의 반응은?
+           - '난 왜 이럴까...' 며칠 내내 자책하며 땅굴을 판다.
+           - 어디서 틀렸는지 처음부터 끝까지 다시 복기하며 스트레스를 받는다.
+           - 순간 욱해서 짜증이 나지만, 금방 다른 일로 주의를 돌린다.
+        4. 나에게 '진정한 휴식'이란 어떤 의미일까?
+           - 아무도 없는 곳에서 연락을 끊고 가만히 누워 있는 것.
+           - 방 청소를 완벽하게 끝내고 모든 게 제자리에 있을 때의 평온함.
+           - 그냥 생각 없이 유튜브를 보거나 재밌는 걸 발견할 때.
+        5. 슬프거나 우울한 감정이 찾아오면 나는?
+           - 모든 연락을 차단하고 나만의 동굴로 깊이 숨어버린다.
+           - 기분을 풀기 위해 갑자기 평소 안 하던 행동을 한다.
+           - 누군가 내 모습을 보고 상처를 줄까 봐 철저히 숨긴다.
+        6. 친한 친구가 갑자기 약속을 취소했다. 내 머릿속은?
+           - '내가 뭐 잘못했나?' 온갖 걱정과 상상의 나래를 펼친다.
+           - '짜증 나!' 순간적으로 화가 확 치밀어 오르고 기분이 상한다.
+           - 서운하긴 하지만, 갑자기 생긴 혼자만의 시간이 은근 다행이다.
+        7. 사람들이 많이 모인 시끄럽고 낯선 장소에 가면?
+           - 기가 쫙 빨려서 집에 갈 시간만 기다린다.
+           - 긴장해서 사람들의 눈치를 살피며 작은 소리에도 놀란다.
+           - 처음엔 산만하지만 분위기에 휩쓸려 내 감정도 덩달아 널뛰기한다.
+        8. 누군가 나에게 칭찬을 해줄 때 나의 속마음은?
+           - '진심일까? 다른 의도가 있는 건 아닐까?' 의심부터 든다.
+           - 겉으론 고맙다 하지만, 내 기준엔 아직 부족해서 온전히 기쁘지 않다.
+           - 기분이 하늘을 찌를 듯이 좋아져서 텐션이 확 올라간다.
+        9. 다른 사람에게 내 속마음을 이야기해야 할 때 나는?
+           - 혹시 약점이 될까 봐 적당히 포장하고 선을 긋는다.
+           - 감정이 먼저 앞서서 정리가 안 된 채로 말이 쏟아져 나온다.
+           - 무슨 말을 할지 머릿속으로 수십 번 시뮬레이션을 돌린다.
+        10. 대화 중에 내가 관심 없는 주제가 나오면?
+           - 나도 모르게 멍때리거나 손을 꼼지락거리고 있다.
+           - 억지로 리액션을 해주면서 에너지를 급격히 소모한다.
+           - 신경 쓰이지만 분위기를 망칠까 봐 눈치를 보며 불안해한다.
+        11. 중요한 시험이나 프로젝트를 앞둔 나의 모습은?
+           - 시작 전부터 실패할까 봐 극도로 불안하고 초조하다.
+           - 계획표를 자로 잰 듯 완벽하게 세워야 시작할 수 있다.
+           - 막상 책상에 앉아도 딴생각이 들고 5분마다 휴대폰을 본다.
+        12. 일이 내 뜻대로, 내 계획대로 풀리지 않으면?
+           - 극심한 스트레스를 받고 어떻게든 원래 계획대로 맞추려 고집한다.
+           - 참을 수 없는 짜증이 밀려와서 소리를 지르고 싶다.
+           - '다 망했어...' 하고 순식간에 의욕을 잃고 모든 걸 놔버린다.
+        13. 무언가에 집중하고 있을 때 누가 말을 걸면?
+           - 흐름이 끊긴 것에 대해 순간적으로 예민하고 날카롭게 반응한다.
+           - 깜짝 놀라며, 하던 일을 멈추고 상대의 눈치를 살핀다.
+           - 금방 대화에 빠져들어 내가 원래 뭘 하고 있었는지 까먹는다.
+        14. 해야 할 일이 산더미일 때 나의 대처법은?
+           - 압박감이 너무 심해서 회피하고 싶어 끝까지 미룬다.
+           - 리스트를 만들고 하나씩 지워가는 강박적인 쾌감을 느낀다.
+           - 이것저것 손대다가 결국 어느 것 하나 제대로 끝내지 못한다.
+        15. 밤에 자려고 누웠을 때 내 머릿속은?
+           - 과거의 부끄러운 일이나 상처받았던 기억이 자꾸 떠올라 괴롭다.
+           - 내일 일어날지도 모르는 최악의 상황들을 상상하며 뒤척인다.
+           - 감정이 갑자기 벅차오르거나 우울해지는 등 기복이 심해진다.
+        16. 나를 가장 힘들게 하는 것은 무엇일까?
+           - 모든 것이 내 통제를 벗어나 불확실해지는 것.
+           - 사람들에게 상처받고 버림받을지도 모른다는 두려움.
+           - 내 안에서 끓어오르는 감정을 주체할 수 없는 것.
+        17. 화가 났을 때 나를 진정시키는 방법은?
+           - 내 감정을 쏟아낼 수 있는 확실한 분출구가 필요하다.
+           - 모든 걸 차단하고 혼자만의 조용한 방어막 안으로 숨는다.
+           - 무언가 다른 새롭고 흥미로운 자극으로 주의를 환기한다.
+        18. 내가 바라는 나의 모습은 어떤 사람일까?
+           - 감정에 휘둘리지 않고 늘 평온하고 단단한 사람.
+           - 사람들과 상처 없이 편안하게 어울릴 수 있는 사람.
+           - 걱정 없이 세상을 가벼운 마음으로 즐길 수 있는 사람.
+        19. 마음이 지쳤을 때 누군가 나에게 해줬으면 하는 말은?
+           - "네 잘못이 아니야. 완벽하지 않아도 괜찮아."
+           - "아무것도 안 해도 돼. 그냥 푹 쉬어."
+           - "네 마음이 어떤지 다 알아. 내가 옆에 있을게."
+        20. 마음의 숲에서 내가 찾고 싶은 장소는 어디일까?
+           - 아무도 나를 해칠 수 없는 푹신하고 안전한 오두막.
+           - 모든 나무와 꽃이 규칙적으로 정돈된 깔끔한 정원.
+           - 어디로 튈지 모르는 생물들이 가득한 모험의 숲.
         """
-    else:
-        # [일상 상담 모드] - 동물 프로필 적용
-        system_prompt = f"""
-        너는 '마음의 숲'의 따뜻한 공감 상담사야. 
-        사용자는 [{user_animal}] 유형 판정을 받은 사람이야.
-        성향에 맞춰 일상 고민을 들어주고 다정하게 위로해 줘.
-        """
-
-    # ----------------------------------------------------
-    # 2. 메시지 조립 및 API 호출
-    # ----------------------------------------------------
-    messages = [{"role": "system", "content": system_prompt}]
-    if chat_history:
-        messages.extend(chat_history)
-    messages.append({"role": "user", "content": user_message})
-
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=messages,
-            temperature=0.7,
-            response_format={ "type": "text" } # JSON과 텍스트 혼용을 위해 text로 유지
-        )
-        reply_content = response.choices[0].message.content.strip()
         
-        # 테스트 종료 시 JSON 파싱 로직
-        if '"is_finished": true' in reply_content:
-            start_idx = reply_content.find('{')
-            end_idx = reply_content.rfind('}') + 1
-            if start_idx != -1 and end_idx != -1:
-                return json.loads(reply_content[start_idx:end_idx])
-            
-        return {"is_finished": False, "reply_message": reply_content}
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "system", "content": system_prompt}] + chat_history + [{"role": "user", "content": user_message}],
+                temperature=0, 
+                response_format={"type": "json_object"}
+            )
+            return json.loads(response.choices[0].message.content.strip())
+        except Exception as e:
+            print(f"온보딩 GPT 에러: {e}")
+            return None
 
-    except Exception as e:
-        print(f"GPT API 에러: {e}")
-        return None
+    else:
+        # [상담 모드] 온보딩 완료 후 다정한 상담사 역할
+        system_prompt = f"너는 '마음의 숲'의 상담사야. 사용자는 [{user_animal}] 유형이야. 사용자의 성향을 고려해 다정하게 공감하고 상담해줘."
+        
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "system", "content": system_prompt}] + chat_history + [{"role": "user", "content": user_message}],
+                temperature=0.7
+            )
+            # 일반 상담은 reply_message로 반환 (is_finished는 False로 고정)
+            return {
+                "is_finished": False, 
+                "reply_message": response.choices[0].message.content.strip()
+            }
+        except Exception as e:
+            print(f"상담 GPT 에러: {e}")
+            return None
+
+# ==========================================
+# 터미널에서 바로 테스트해 볼 수 있는 실행 코드
+# ==========================================
+if __name__ == "__main__":
+    print("🌲 마음의 숲 챗봇 시뮬레이션 시작 (종료를 원하면 '종료' 입력) 🌲")
+    mock_history = []
+    
+    while True:
+        user_input = input("\n👤 사용자: ")
+        if user_input.strip() == "종료":
+            break
+            
+        bot_response = get_chat_response(user_input, mock_history)
+        
+        if bot_response is None:
+            print("❌ AI 응답에 문제가 발생했습니다.")
+            break
+            
+        if bot_response.get("is_finished"):
+            print("\n🎉 [진단 완료!] 프론트엔드로 전달될 최종 결과:")
+            print(json.dumps(bot_response, indent=2, ensure_ascii=False))
+            break
+        elif bot_response.get("type") == "select":
+            print("\n📦 [JSON 질문 데이터]")
+            print(json.dumps(bot_response, indent=2, ensure_ascii=False))
+            
+            # 다음 대화 기억을 위해 답변 내용 기록
+            mock_history.append({"role": "user", "content": user_input})
+            mock_history.append({"role": "assistant", "content": json.dumps(bot_response, ensure_ascii=False)})
+        else:
+            # 일반 상담 메시지 출력
+            print(f"\n🤖 챗봇: {bot_response.get('reply_message')}")
+            mock_history.append({"role": "user", "content": user_input})
+            mock_history.append({"role": "assistant", "content": bot_response.get('reply_message')})
