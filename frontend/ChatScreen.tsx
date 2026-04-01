@@ -7,6 +7,7 @@ import SurveyInput from './SurveyInput';
 import { useIsFocused } from '@react-navigation/native';
 import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import { COLORS } from './assets/Maincolors';
+import ResultModal, { SurveyResult } from './ResultModal';
 
 
 //메세지 구조 잡기
@@ -22,7 +23,7 @@ const MOCK_MESSAGES: Message[] = [
     {id: '1', text: "상대방 매세지", sender: 'ai', time: '오전 10:00'},
     {id: '2', text: "나의 메세지", sender: 'user', time: '오전 11:00'},
     //{id: '3', text: `{"type": "select", "title": "질문 내용", "detail": ["옵션1", "옵션2", "옵션3"]}`, sender: 'ai', time: '오전 12:00'},
-    //{id: '4', text: `{"type": "select", "title": "1. 아침에 눈을 떴을 때, 오늘 하루의 일정이 꽉 차 있다면?", "detail": ["① 벌써 기가 빨려... 이불 속으로 다시 들어가고 싶다. ", "② 시간 단위로 쪼개야 해! 머릿속으로 완벽한 시뮬레이션을 돌린다.", "③ 일단 부딪혀! 막상 나가면 어떻게든 흘러가겠지 생각한다."]}`, sender: 'ai', time: '오전 12:00'}
+    {id: '3', text: `{"is_finished": true,"result_emoji": "🐢","result_name": "조용히 숨 고르는 거북이"}`, sender: 'ai', time: '오전 12:00'},
 ];
 
 
@@ -30,7 +31,10 @@ const MOCK_MESSAGES: Message[] = [
 const ChatScreen = () => {
   const isFocused = useIsFocused();//현재 화면이 포커스 되어있는지 확인
   const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
+  const lastMessage = messages[messages.length - 1];//마지막 메세지 가져오기
+  const [surveyResult, setSurveyResult] = useState<SurveyResult | null>(null);
   const [inputText, setInputText] = useState<string>('');
+  const [modalVisible, setModalVisible] = useState(false);
 
 
   //백앤드 메세지 요청/응답 함수
@@ -49,7 +53,7 @@ const ChatScreen = () => {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({message: inputText, history: messages}),
       });
-       
+       console.log('보냈음', response);
       //ai 응답 후 메세지 보내는 함수
       const aiResponse = await response.json();
       const aimag: Message = {
@@ -73,9 +77,9 @@ const ChatScreen = () => {
     };
     setMessages(prevMessages => [...prevMessages, newMessage]);
   };
+
   //설문데이터인지 판별하는 함수
   const getsurveyData = () => {
-    const lastMessage = messages[messages.length - 1];//마지막 메세지 가져오기
     if (lastMessage.sender !==`ai`) return null;
     try{
       if(lastMessage.text.includes(`{"type": "select"`)) {
@@ -89,18 +93,28 @@ const ChatScreen = () => {
       return null;
   };
 
-  //하단바 채팅 입력창 생성
+  //설문조사 데이터, 결과 등의 데이터 여부에 따라 이벤트 처리
   const { setBottomBarContent } = useBottomBar();
   useEffect(() => {
     if(isFocused){
       const surveyData = getsurveyData();
-      if (surveyData){//설문데이터일 시
+      if (surveyData){//설문데이터일 시 -> 하단바를 설문 입력창으로 변경
         setBottomBarContent(
           <SurveyInput
           title={surveyData.title}
           options={surveyData.detail}
           onSelect={(value) => {sendMessages(value);}}/>
         )
+      }else if(lastMessage.sender === 'ai' && lastMessage.text.includes(`"is_finished": true`)){//결과 데이터일 시 -> 하단바를 결과 모달로 변경
+        try{
+          const parsedData = JSON.parse(lastMessage.text);
+          setSurveyResult(parsedData);
+          setModalVisible(true);
+          console.log('결과 데이터 파싱 성공', parsedData);
+        }catch (error){
+          console.error('json 파싱 실패', error);
+        }
+        setBottomBarContent(<ChatInput onSend={(inputText) => {handleSendMessage(inputText);}}/>);
       }else{//그 이외에는 일반 채팅을 보여줌
         setBottomBarContent(
           <ChatInput
@@ -156,6 +170,7 @@ const ChatScreen = () => {
       renderItem= {renderMessages}
       keyExtractor={item => item.id}
     />
+    <ResultModal isVisible={modalVisible} data={surveyResult} onClose={() => setModalVisible(false)}/>
   </View>
   );
 };
