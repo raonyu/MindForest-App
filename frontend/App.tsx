@@ -13,10 +13,14 @@ import {BottomBarProvider, useBottomBar} from './BottomBarContext';
 import { useIsFocused } from '@react-navigation/native';
 import { COLORS } from './assets/Maincolors';
 
-//하단바 컨텍스트 생성
+
+
+
+
+
+//하단바 컨텍스트 생성 및 애니메이션
 const BottomBar = () => {
   const { BottomBar:content } = useBottomBar();
-
   const yPosAnim = useRef(new Animated.Value(100)).current;//하단바 애니메이션 초기위치 설정
 
   useEffect(() => {
@@ -25,13 +29,10 @@ const BottomBar = () => {
     }else{
       yPosAnim.setValue(100);
     }
-
-
   }, [content]);
 
-
-
   if (!content) return null;
+
   return (
   <Animated.View style={[styles.bottomBar, {transform: [{translateY: yPosAnim}]}]}>
     {content}
