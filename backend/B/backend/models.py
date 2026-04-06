@@ -10,15 +10,14 @@ class User(Base):
     id = Column(String, primary_key=True, index=True)
     email = Column(String, unique=True)
     password = Column(String)
-    # [수정] timezone=True 추가: 시간대 충돌 에러 방지
+    
+    # [요구사항 2] 가입일(signup_date)로 활용할 필드: timezone=True 설정 확인 완료
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
-    # 온보딩 및 캐릭터 정보
     is_onboarding_done = Column(Boolean, default=False)
-    user_animal = Column(String, nullable=True) # 예: "정리대장 펭귄"
-    assigned_category = Column(String, nullable=True) # GPT가 분류한 질환 코드 (예: "OCD")
+    user_animal = Column(String, nullable=True) 
+    assigned_category = Column(String, nullable=True)
 
-    # 관계 설정
     diaries = relationship("Diary", back_populates="author")
     survey_results = relationship("SurveyResult", back_populates="user")
     chat_histories = relationship("ChatHistory", back_populates="user")
@@ -33,8 +32,15 @@ class Diary(Base):
     user_id = Column(String, ForeignKey("users.id"))
     content = Column(Text)
 
-    # 루틴 데이터 (담당 C 로직용)
+    # 루틴 데이터
     routine_name = Column(String, nullable=True)
+    
+    # [요구사항 1] 신규 필드 추가
+    # routine_category: 활동형, 휴식형 등 루틴 유형 저장
+    routine_category = Column(String, nullable=True)
+    # score_diff: 루틴 수행 전후의 마음 온도 변화량 (난이도 결정 지표)
+    score_diff = Column(Float, default=0.0)
+
     is_done = Column(Boolean, default=False)
 
     # 8가지 감정 수치
@@ -47,76 +53,58 @@ class Diary(Base):
     surprise = Column(Float, default=0.0)
     anticipation = Column(Float, default=0.0)
 
-    # [수정] timezone=True 추가
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     analysis_comment = Column(String)
     
     author = relationship("User", back_populates="diaries")
-    # 1:1 관계 (uselist=False)
     analysis_data = relationship("Analysis", back_populates="diary", uselist=False)
 
 
-# --- 3. 개별 일기 심층 분석 테이블 (마음의 가면 로직용) ---
+# --- 3. 개별 일기 심층 분석 테이블 ---
 class Analysis(Base):
     __tablename__ = "analysis"
 
     id = Column(Integer, primary_key=True, index=True)
     diary_id = Column(Integer, ForeignKey("diaries.id"))
-    emotion = Column(String) # 주된 감정
-    score = Column(Float, default=0.0) # 강도
+    emotion = Column(String) 
+    score = Column(Float, default=0.0) 
     feedback = Column(Text)
 
     diary = relationship("Diary", back_populates="analysis_data")
 
 
-# --- 4. 정밀 설문지 문항 테이블 ---
+# --- 4~7. 설문 및 챗봇 테이블 (기존 동일) ---
 class Survey(Base):
     __tablename__ = "surveys"
-
     id = Column(Integer, primary_key=True, index=True)
-    survey_type = Column(String) # 예: "ADHD", "PHQ-9"
-    question_num = Column(Integer) # 1~9번 문항 구분용
+    survey_type = Column(String)
+    question_num = Column(Integer)
     question_text = Column(Text)
 
-
-# --- 5. 사용자별 설문 답변 상세 테이블 ---
 class SurveyAnswer(Base):
     __tablename__ = "survey_answers"
-
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, ForeignKey("users.id"))
     survey_type = Column(String)
     question_num = Column(Integer)
-    answer = Column(Integer) # 선택한 점수 (0~3 또는 1~5)
-
+    answer = Column(Integer)
     user = relationship("User", back_populates="survey_answers")
 
-
-# --- 6. 설문 최종 결과 저장 테이블 ---
 class SurveyResult(Base):
     __tablename__ = "survey_results"
-
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, ForeignKey("users.id"))
     survey_type = Column(String)
-    score = Column(Integer) # 총점
-    result_message = Column(String) # "중등도 우울" 등 결과 요약
-    
-    # [수정] 생성일자 추가 (변화 추이 확인용)
+    score = Column(Integer)
+    result_message = Column(String)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    
     user = relationship("User", back_populates="survey_results")
 
-
-# --- 7. 챗봇 대화 이력 테이블 ---
 class ChatHistory(Base):
     __tablename__ = "chat_histories"
-    
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, ForeignKey("users.id"))
-    role = Column(String)    # "user" 또는 "assistant"
+    role = Column(String)
     content = Column(Text)
-    # [수정] timezone=True 추가
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    
     user = relationship("User", back_populates="chat_histories")

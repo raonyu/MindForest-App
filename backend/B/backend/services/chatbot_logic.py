@@ -2,34 +2,37 @@ import os
 import json
 from openai import OpenAI
 from dotenv import load_dotenv
+from datetime import datetime
 
 # 환경변수 로드 및 OpenAI 클라이언트 세팅
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-def get_chat_response(user_message, chat_history=None, is_onboarding_done=False, user_animal=""):
+def get_chat_response(user_message, chat_history=None, is_onboarding_done=False, user_animal="", signup_date=None):
     """
     마음의 숲 챗봇 메인 엔진
-    - 온보딩 시: 20문항 객관식 JSON 출력
-    - 온보딩 완료 시: 다정한 상담 모드 전환
+    - [수정] signup_date(가입일) 매개변수 추가: 사용자와의 유대감 형성 및 분석용
     """
     if chat_history is None:
         chat_history = []
 
+    # 가입 기간 계산 (상담 모드에서 활용)
+    days_since_signup = 0
+    if signup_date:
+        delta = datetime.now(signup_date.tzinfo) - signup_date
+        days_since_signup = delta.days
+
     if not is_onboarding_done:
-        # [온보딩 모드] 20문항 대본 및 9대 질병군 캐릭터 전체 포함
+        # [온보딩 모드] 20문항 대본 및 9대 질병군 캐릭터
+        # [수정] ai_logic.py의 DISEASE_ANIMAL_MAP과 동물 명칭을 동일하게 맞췄습니다.
         system_prompt = """
-        너는 '마음의 숲' 앱의 심리 테스터야
+        너는 '마음의 숲' 앱의 심리 테스터야.
         지금부터 아래의 [마음의 숲 사전 테스트 20문항]을 바탕으로 사용자의 내면 동물을 찾아줘.
 
-        [🚨 진행 및 출력 규칙 - 매우 중요!]
-        1. 모든 응답은 반드시 마크다운(```json)이 없는 순수한 JSON 형식으로만 출력해.
-        2. 질문을 던질 때는 무조건 '포맷 1'을 지켜. 인사말이나 리액션 없이 질문 내용만 "title"에 넣어.
-        3. 20번 문항까지 대답이 끝나면, 점수를 종합해 9가지 동물 중 하나를 고르고 '포맷 2' 형식으로 출력해.
-        4. 대화 기록(chat_history)을 확인하여 마지막으로 나간 질문 번호를 파악해.
-        5. 사용자가 답변을 했다면, 반드시 '그 다음 번호'의 질문을 던져야 해. (예 : 1번 답을 받으면 2번 질문)
-        6. 절대로 같은 번호의 질문을 반복하지 마.
-        7. 모든 응답은 순수 JSON 포맷만 허용해.
+        [🚨 진행 및 출력 규칙]
+        1. 응답은 마크다운 없이 순수한 JSON 형식으로만 출력해.
+        2. 질문 시 '포맷 1', 종료 시 '포맷 2'를 엄격히 지켜.
+        3. 사용자의 이전 답변을 확인하여 중복 질문을 하지 말고 순차적으로 진행해.
 
         [출력 JSON 포맷 1: 질문할 때]
         {
@@ -38,28 +41,27 @@ def get_chat_response(user_message, chat_history=None, is_onboarding_done=False,
           "detail": ["선택지 1", "선택지 2", "선택지 3"]
         }
 
-        [출력 JSON 포맷 2: 테스트가 모두 끝났을 때]
+        [출력 JSON 포맷 2: 테스트 종료 시]
         {
           "is_finished": true,
           "category": "ADHD", 
           "result_emoji": "🐿️",
-          "result_name": "도토리 찾는 꼬마 다람쥐"
+          "result_name": "산만한 꼬마 다람쥐"
         }
 
-        [카테고리 리스트: DEPRESSION, BIPOLAR, ANXIETY, SCHIZOPHRENIA, PTSD, OCD, ADHD, EATING_DISORDER, ANGER]
-
-        [결과 판정 기준 : 9가지 동물 유형]
-        - DEPRESSION: 조용히 숨 고르는 거북이
+        [카테고리 및 동물 매핑]
+        - DEPRESSION: 조용히 움츠린 거북이
         - BIPOLAR: 알록달록 카멜레온
-        - ANXIETY: 귀를 쫑긋 세운 토끼
+        - ANXIETY: 안절부절 미어캣
         - SCHIZOPHRENIA: 몽환적인 검은 고양이
-        - PTSD: 가시 옷을 입은 고슴도치
-        - OCD: 각 잡힌 정돈대장 펭귄
-        - ADHD: 도토리 찾는 꼬마 다람쥐
+        - PTSD: 상처를 방패 삼은 고슴도치
+        - OCD: 정리대장 펭귄
+        - ADHD: 산만한 꼬마 다람쥐
         - EATING_DISORDER: 마음을 채우는 판다
-        - ANGER: 볼이 빵빵한 화난 햄스터
+        - ANGER: 까칠한 햄스터
 
         [마음의 숲 사전 테스트 20문항]
+        (중략: 1번~20번 문항 데이터 유지)
         1. 아침에 눈을 떴을 때, 오늘 하루의 일정이 꽉 차 있다면?
            - "벌써 기가 빨려..." 이불 속으로 다시 들어가고 싶다.
            - "시간 단위로 쪼개야 해!" 머릿속으로 완벽한 시뮬레이션을 돌린다.
@@ -156,7 +158,16 @@ def get_chat_response(user_message, chat_history=None, is_onboarding_done=False,
 
     else:
         # [상담 모드] 온보딩 완료 후 다정한 상담사 역할
-        system_prompt = f"너는 '마음의 숲'의 상담사야. 사용자는 [{user_animal}] 유형이야. 사용자의 성향을 고려해 다정하게 공감하고 상담해줘."
+        # [수정] 가입일(signup_date) 정보를 활용하여 더 개인화된 멘트를 생성하도록 프롬프트 보강
+        system_prompt = f"""
+        너는 '마음의 숲'의 다정한 상담사야. 
+        사용자는 현재 [{user_animal}] 유형으로 진단받았어.
+        
+        정보:
+        - 사용자가 우리 숲에 머문 지 {days_since_signup}일째야.
+        - 사용자가 루틴(활동형/휴식형)을 잘 수행하도록 격려하고 공감해줘.
+        - 대화 중간에 "오늘의 마음 온도는 어때?"와 같이 상태를 물어봐줘.
+        """
         
         try:
             response = client.chat.completions.create(
@@ -164,7 +175,6 @@ def get_chat_response(user_message, chat_history=None, is_onboarding_done=False,
                 messages=[{"role": "system", "content": system_prompt}] + chat_history + [{"role": "user", "content": user_message}],
                 temperature=0.7
             )
-            # 일반 상담은 reply_message로 반환 (is_finished는 False로 고정)
             return {
                 "is_finished": False, 
                 "reply_message": response.choices[0].message.content.strip()
@@ -173,37 +183,10 @@ def get_chat_response(user_message, chat_history=None, is_onboarding_done=False,
             print(f"상담 GPT 에러: {e}")
             return None
 
-# ==========================================
-# 터미널에서 바로 테스트해 볼 수 있는 실행 코드
-# ==========================================
+# 테스트용 코드 (로컬 확인용)
 if __name__ == "__main__":
-    print("🌲 마음의 숲 챗봇 시뮬레이션 시작 (종료를 원하면 '종료' 입력) 🌲")
-    mock_history = []
-    
-    while True:
-        user_input = input("\n👤 사용자: ")
-        if user_input.strip() == "종료":
-            break
-            
-        bot_response = get_chat_response(user_input, mock_history)
-        
-        if bot_response is None:
-            print("❌ AI 응답에 문제가 발생했습니다.")
-            break
-            
-        if bot_response.get("is_finished"):
-            print("\n🎉 [진단 완료!] 프론트엔드로 전달될 최종 결과:")
-            print(json.dumps(bot_response, indent=2, ensure_ascii=False))
-            break
-        elif bot_response.get("type") == "select":
-            print("\n📦 [JSON 질문 데이터]")
-            print(json.dumps(bot_response, indent=2, ensure_ascii=False))
-            
-            # 다음 대화 기억을 위해 답변 내용 기록
-            mock_history.append({"role": "user", "content": user_input})
-            mock_history.append({"role": "assistant", "content": json.dumps(bot_response, ensure_ascii=False)})
-        else:
-            # 일반 상담 메시지 출력
-            print(f"\n🤖 챗봇: {bot_response.get('reply_message')}")
-            mock_history.append({"role": "user", "content": user_input})
-            mock_history.append({"role": "assistant", "content": bot_response.get('reply_message')})
+    print("🌲 마음의 숲 챗봇 시뮬레이션 시작 🌲")
+    # 테스트를 위해 가입일을 현재로부터 5일 전으로 가정
+    test_signup_date = datetime.now() # 실제로는 DB의 created_at 데이터가 들어옴
+    bot_response = get_chat_response("안녕?", is_onboarding_done=True, user_animal="정리대장 펭귄", signup_date=test_signup_date)
+    print(f"🤖 챗봇: {bot_response.get('reply_message')}")

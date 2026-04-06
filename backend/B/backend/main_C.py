@@ -1,51 +1,67 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
 from typing import List
-import models  # 담당 B가 만든 DB 모델 연동
+import models  
+from database import engine, get_db  
+from analysis_C import get_mind_forest_report  
+# [추가] 새로 만든 루틴 매니저 불러오기
+from routine_manager import get_recommended_routines  
+import datetime
 
-app = FastAPI()
+models.Base.metadata.create_all(bind=engine)
 
-# 9유형 진단 가중치 데이터 (아까 우리가 정한 20문항 로직)
-# 예시로 몇 개만 넣었으니, 팀에서 정한 전체 로직을 이 형식대로 채우면 돼!
-WEIGHTS = {
-    1: {1: {"A": 1, "C": 1}, 2: {"H": 2, "B": 1}},
-    2: {1: {"B": 2, "E": 1}, 2: {"D": 1, "I": 2}},
-    3: {1: {"G": 2}, 2: {"F": 1, "A": 1}},
-    # ... 20번 문항까지 같은 방식으로 추가
-}
+app = FastAPI(
+    title="마음의 숲(MindForest) 통합 API - 담당 C 김예영",
+    description="심리 지표 분석 및 개인 맞춤형 루틴 추천 서비스를 제공합니다."
+)
 
-@app.post("/test/diagnose")
-def diagnose_user(answers: List[int]):
+# 1. 기존 심리 지표 리포트 엔드포인트
+@app.get("/api/analysis/report/{user_id}")
+def generate_report(user_id: str, db: Session = Depends(get_db)):
+    try:
+        report_data = get_mind_forest_report(db, user_id)
+        if "error" in report_data:
+            raise HTTPException(status_code=404, detail=report_data["error"])
+        return report_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"분석 엔진 구동 실패: {str(e)}")
+
+# 2. [신규] 개인 맞춤형 루틴 추천 엔드포인트
+@app.get("/api/routine/recommend/{user_id}")
+def recommend_routine(user_id: str, db: Session = Depends(get_db)):
     """
-    사용자가 선택한 답변 리스트(예: [1, 2, 1, ...])를 받아
-    가중치를 합산하여 최종 심리 유형을 반환합니다.
+    사용자의 가입일과 과거 로그를 분석하여 오늘 수행할 루틴 3개를 추천합니다.
     """
-    # 점수 초기화 (A~I 유형)
-    scores = {k: 0 for k in "ABCDEFGHI"}
-    
-    # 답변 리스트를 돌면서 가중치 합산
-    for i, ans in enumerate(answers):
-        q_num = i + 1  # 문항 번호 (1부터 시작)
-        if q_num in WEIGHTS and ans in WEIGHTS[q_num]:
-            for type_key, weight in WEIGHTS[q_num][ans].items():
-                scores[type_key] += weight
-    
-    # 가장 높은 점수를 받은 유형 결정
-    final_type = max(scores, key=scores.get)
-    
-    # 유형별 캐릭터 매핑 (예시)
-    characters = {
-        "A": "움츠린 거북이",
-        "H": "까칠한 햄스터",
-        "I": "산만한 다람쥐"
-    }
-    
-    return {
-        "final_type": final_type,
-        "character_name": characters.get(final_type, "미확인 유형"),
-        "all_scores": scores,
-        "message": "성격 유형 진단이 완료되었습니다."
-    }
+    try:
+        # DB에서 유저 정보와 로그 가져오기 (B파트 연동 부분)
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
 
-@app.get("/health")
+        # 추천 엔진에 넘겨줄 데이터 포맷팅
+        # (실제 서비스 시 user.logs 등을 연동해야 함)
+        user_data = {
+            'signup_date': user.created_at.date(), 
+            'logs': [] # 실제로는 DB의 루틴 수행 이력을 쿼리해서 넣어야 함
+        }
+        
+        # 담당 C의 루틴 추천 엔진 실행
+        recommendations = get_recommended_routines(user_data)
+        
+        return {"today_routines": recommendations}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"루틴 추천 실패: {str(e)}")
+
+@app.get("/api/analysis/check")
 def health_check():
-    return {"status": "ok", "message": "담당 C 서버 정상 작동 중"}
+    return {
+        "status": "ready",
+        "developer": "Kim Ye-young",
+        "target": "University of Ulsan Team Project",
+        "features": ["Mental Report", "Routine Recommendation"]
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

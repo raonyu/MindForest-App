@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
-import models, analysis_C
+import models
+# [수정] C의 실제 파일인 routine_manager를 임포트합니다.
+import routine_manager 
 from services.emotion_service import get_recent_emotions
 from services.ai_logic import check_anomaly_level
 
@@ -12,6 +14,7 @@ router = APIRouter()
 def get_analysis(diary_id: int, db: Session = Depends(get_db)):
     """
     일기 작성 직후 또는 과거 기록 확인 시, 8종 감정 수치와 AI 코멘트를 반환합니다.
+    [요구사항 반영] Diary 테이블에 추가된 루틴 카테고리와 score_diff를 결과에 포함합니다.
     """
     diary = db.query(models.Diary).filter(models.Diary.id == diary_id).first()
     
@@ -21,6 +24,12 @@ def get_analysis(diary_id: int, db: Session = Depends(get_db)):
     return {
         "diary_id": diary.id,
         "content": diary.content,
+        "routine_info": {
+            "name": diary.routine_name,
+            "category": diary.routine_category,  # [요구사항 1] 루틴 유형 저장 확인
+            "score_diff": diary.score_diff,      # [요구사항 1] 마음 온도 변화량 확인
+            "is_done": diary.is_done
+        },
         "emotions": {
             "joy": diary.joy,
             "sadness": diary.sadness,
@@ -32,6 +41,7 @@ def get_analysis(diary_id: int, db: Session = Depends(get_db)):
             "anticipation": diary.anticipation
         },
         "comment": diary.analysis_comment,
+        # [요구사항 2] 가입일 계산 시 에러 없는 timezone 적용 시간
         "created_at": diary.created_at
     }
 
@@ -39,9 +49,8 @@ def get_analysis(diary_id: int, db: Session = Depends(get_db)):
 @router.get("/api/emotion-alert/{user_id}")
 def emotion_alert(user_id: str, db: Session = Depends(get_db)):
     """
-    메인 화면 진입 시 사용자의 최근 7일 감정 흐름을 분석하여 경고 레벨을 알려줍니다.
+    사용자의 최근 7일 감정 흐름을 분석하여 경고 레벨을 반환합니다.
     """
-    # 1. 최근 감정 데이터 추출 (B의 서비스 로직 호출)
     recent_data = get_recent_emotions(user_id, db) 
 
     if not recent_data:
@@ -50,33 +59,46 @@ def emotion_alert(user_id: str, db: Session = Depends(get_db)):
             "message": "아직 분석할 데이터가 부족해요. 일기를 써서 마음을 기록해보세요!"
         }
 
-    # 2. 이상징후 판정 (A의 AI 로직 호출)
+    # AI 로직을 통한 상태 판정
     result = check_anomaly_level(recent_data)
-
     return result
 
-# --- [STEP 3] 주간 리포트 및 맞춤형 추천 조회 ---
+# --- [STEP 3] 주간 리포트 및 맞춤형 추천 조회 (C의 로직 연동) ---
 @router.get("/api/report/{user_id}")
 def get_report(user_id: str, db: Session = Depends(get_db)):
     """
-    [담당 C 협업] 지난주 대비 변화율과 질환 카테고리별 맞춤 추천을 반환합니다.
+    [담당 C 협업] C의 실제 로직을 사용하여 주간 분석 리포트와 맞춤 루틴 추천을 생성합니다.
     """
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
     
-    # 1. C의 주간 성장률/반등지수 로직 호출
-    report_res = analysis_C.get_weekly_report(db, user_id)
+    # 1. C의 분석 함수(analyze_routine_logs)를 위한 데이터 가공
+    # DB에 저장된 user.diaries 데이터를 C가 요구하는 딕셔너리 리스트 형태로 변환합니다.
+    logs = [
+        {
+            "category": d.routine_category,
+            "score_diff": d.score_diff if d.score_diff else 0.0,
+            "is_completed": d.is_done
+        }
+        for d in user.diaries
+    ]
     
-    # 2. C의 맞춤형 추천 로직 호출 (B의 필드 연동)
-    # [수정] 이제 ANIMAL_MAP 없이 DB에 저장된 assigned_category를 바로 사용합니다.
-    category = user.assigned_category if user.assigned_category else "DEPRESSION"
-    recommendation = analysis_C.get_personalized_recommendation(category)
+    # C의 분석 로직 호출
+    report_res = routine_manager.analyze_routine_logs(logs)
+    
+    # 2. C의 추천 로직(get_recommended_routines) 호출
+    # user 객체를 통째로 넘기면 C의 함수가 내부에서 가입일과 일기 목록을 분석합니다.
+    recommendations = routine_manager.get_recommended_routines(user)
+    
+    # 3. 가입일 확인 (요구사항 2: signup_date)
+    signup_date = user.created_at
 
     return {
         "user_id": user_id,
-        "user_animal": user.user_animal, # 예: "정리대장 펭귄"
-        "assigned_category": category,    # 예: "OCD"
-        "weekly_analysis": report_res,
-        "recommendation": recommendation
+        "user_animal": user.user_animal,
+        "assigned_category": user.assigned_category,
+        "signup_date": signup_date,
+        "weekly_analysis": report_res,   # C의 analyze_routine_logs 결과
+        "recommendations": recommendations # C의 get_recommended_routines 결과
     }
