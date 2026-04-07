@@ -15,8 +15,8 @@ import { COLORS } from './assets/Maincolors';
 
 
 
-
-
+//상단 텝 컴포넌트 생성
+const Tab = createMaterialTopTabNavigator();
 
 //하단바 컨텍스트 생성 및 애니메이션
 const BottomBar = () => {
@@ -41,10 +41,12 @@ const BottomBar = () => {
 };
 
 
-
-
 //각 화면 컴포넌트 불러오기
 import ChatScreen from './ChatScreen';
+import DiaryScreen from './DiaryScreen';
+
+
+//메인화면 컴포넌트
 const MainScreen = () => {
   const isFocused = useIsFocused();//현재 화면이 포커스 되어있는지 확인
   const { setBottomBarContent } = useBottomBar();
@@ -56,13 +58,13 @@ const MainScreen = () => {
           <View style={styles.bottomTitleContainer}>
             <Text style={styles.bottomBarText}>메인화면입니다</Text>
           </View>
-          
         </View>
     );
     //다른 화면으로 전환 시 하단바 초기화
     return () => setBottomBarContent(null);
     } 
   }, [isFocused]);
+
   //메인 화면 내용
   return (
   <View style={{backgroundColor: '#D7D6D6'}}>
@@ -73,15 +75,7 @@ const MainScreen = () => {
   </View>)
 };
 
-const DiaryScreen = () => (
-  <View><Text>감정일기 달력 화면</Text></View>
-);
-//텝 컴포넌트 생성
-const Tab = createMaterialTopTabNavigator();
-//버튼 선언
-const CustomButton = () =>(
-  <TouchableOpacity style = {styles.baseButton}><Text>버튼임</Text></TouchableOpacity>
-);
+
 
 function App(){
   const isDarkMode = useColorScheme() === 'dark';
