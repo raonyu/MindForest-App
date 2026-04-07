@@ -114,11 +114,11 @@ const ChatScreen = () => {
         }catch (error){
           console.error('json 파싱 실패', error);
         }
-        setBottomBarContent(<ChatInput onSend={(inputText) => {handleSendMessage(inputText);}}/>);
+        setBottomBarContent(<ChatInput onSend={(inputText) => {sendMessages(inputText);}}/>);
       }else{//그 이외에는 일반 채팅을 보여줌
         setBottomBarContent(
           <ChatInput
-          onSend={(inputText) => {handleSendMessage(inputText);
+          onSend={(inputText) => {sendMessages(inputText);
           }}
           />
         );
