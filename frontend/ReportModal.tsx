@@ -1,35 +1,55 @@
-import {Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import {Modal, View, Text, TouchableOpacity, StyleSheet} from 'react-native';
 import { COLORS } from './assets/Maincolors';
 
 
 //결과 데이터 구조
-export interface SurveyResult {
+export interface ReportResult {
     isComplete: boolean;
-    result_emoji: string;
-    result_name: string;
+    report_explain: string;
+    result_detail: string;
 }
 
 
-interface ResultModalProps {
+interface ReportModalProps {
     isVisible: boolean;
-    data: SurveyResult | null;
+    data: ReportResult | null;
     onClose: () => void;
 }
 
-const ResultModal = ({isVisible, data, onClose}: ResultModalProps) => {
+const ReportModal = ({isVisible, data, onClose}: ReportModalProps) => {
     if (!data) return null;
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const reportTitles = ["주간 지배 감정", "마음 온도", "감정 롤러코스터", "루틴 효능 랭킹", "마음의 빈자리", "감정 레드 존", "마음 안전망 방어", "마음의 가면", "아픔의 뿌리", "위기 도달 확률"];
+    const parsedData = JSON.parse(data.result_detail);
+
+    //카드 위쪽 부분 렌더링
+    const RenderCardImg = ({index}: {index: number}) => {
+        switch(index){
+            case 0:
+                return <View style={[styles.cardImg, { backgroundColor: "blue"}]}><Text style = {{fontSize: 128, textAlign: 'center'}}>{parsedData.result_detail.emoji}</Text></View>
+            case 1:
+                return <View style={[styles.cardImg, { backgroundColor: "green"}]}><Text style = {{fontSize: 128, textAlign: 'center'}}>{parsedData.result_detail.temperature}</Text></View>
+        }
+    }
+
+
+
+
+
+
+
+
     return(
         <Modal transparent = {true} visible={isVisible} animationType='fade' onRequestClose={onClose}>
             <TouchableOpacity style={styles.overlay} activeOpacity={1} onPressOut={onClose}>
             <View style={styles.card}>
-                <View style={styles.cardImg}>
-                    <Text style={{fontSize: 24,textAlign: 'center', color: 'white', marginTop: 16}}>심리검사 결과</Text>
-                    <Text style = {{fontSize: 128, textAlign: 'center'}}>{data.result_emoji}</Text></View>
+                <RenderCardImg index={currentIndex}></RenderCardImg>
                 <View style={styles.cardDetail}>
                     <Text
-                        style={{fontSize: 36, textAlign: 'center', fontWeight: 'bold', width: '100%', padding: 4}}
+                        style={{fontSize: 36, fontWeight: 'bold', width: '100%', padding: 4}}
                         numberOfLines={1}
-                        minimumFontScale={0.1}>{data.result_name}</Text>
+                        minimumFontScale={0.1}>{reportTitles[0]}</Text>
                     <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                         <Text style={{ color: 'white',fontSize: 24}}>확인</Text>
                     </TouchableOpacity>
@@ -87,4 +107,4 @@ const styles = StyleSheet.create({
 });
 
 
-export default ResultModal;
+export default ReportModal;
