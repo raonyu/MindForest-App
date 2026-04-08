@@ -77,17 +77,26 @@ def get_mind_forest_report(db: Session, user_id: str):
 
     # ---------------------------------------------------------
     # 최종 결과 반환 (1번~12번 지표 통합)
+
+    
     return {
-        "indicator_1": emoji_map.get(top_emo, "😐"),
-        "indicator_2": {"temp": f"{round(this_avg, 1)}도", "msg": f"지난주보다 {abs(diff)}도 {'높아졌어요' if diff >= 0 else '낮아졌어요'}"},
+        "indicator_1": {"report_explain": emoji_map.get(top_emo, "😐"),
+                        "report_value": emoji_map.get(top_emo, "😐")},
+        "indicator_2": {"report_explain": f"현재 마음 온도는 {round(this_avg, 1)}도 지난주보다 {abs(diff)}도 {'높아졌어요' if diff >= 0 else '낮아졌어요'}",
+                        "report_value": {"temp": f"{round(this_avg, 1)}", "msg": f"{abs(diff)}"}},
         "indicator_3": df_7[["created_at", "temp_val"]].sort_values("created_at").to_dict("records"),
         "indicator_4": f"{round(this_avg, 1)}%",
         "indicator_5": indicator_5,
-        "indicator_6": f"14일 중 {df['created_at'].dt.date.nunique()}일 기록 성공",
-        "indicator_7": f"루틴 수행 여부에 따라 에너지가 {abs(diff)}도 변화하는 패턴이 확인됩니다.",
-        "indicator_8": f"🛡️ 이번 주 {len(red_points)}번의 급격한 감정 하락 방어",
-        "indicator_9": red_points,
-        "indicator_10": {"user": round(this_avg, 1), "ai": ai_val, "gap": round(abs(this_avg - ai_val), 1)},
+        "indicator_6": {"report_explain": f"14일 중 {df['created_at'].dt.date.nunique()}일 기록 성공",
+                        "report_value": f"{df['created_at'].dt.date.nunique()}"},
+        "indicator_7": {"report_explain": f"루틴 수행 여부에 따라 에너지가 {abs(diff)}도 변화하는 패턴이 확인됩니다.",
+                        "report_value": f"{abs(diff)}"},
+        "indicator_8": {"report_explain": f"🛡️ 이번 주 {len(red_points)}번의 급격한 감정 하락 방어",
+                        "report_value": f"{len(red_points)}"},
+        "indicator_9": {"report_explain": f"🔴 {red_points}개의 레드존 포인트가 감지되었습니다.",
+                        "report_value": red_points},
+        "indicator_10": {"report_explain": f"사용자님의 감정점수는 AI 예측과 {round(abs(this_avg - ai_val), 1)}도 차이가 나요.",
+                        "report_value": {"user": round(this_avg, 1), "ai": ai_val, "gap": round(abs(this_avg - ai_val), 1)}},
         "indicator_11": df_7["analysis_comment"].fillna("").str.split(",").explode().str.strip().replace("", np.nan).dropna().value_counts().head(3).index.tolist(),
         "indicator_12": f"{round(max(0, 100 - this_avg), 1)}%"
     }
