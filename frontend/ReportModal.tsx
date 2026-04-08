@@ -4,12 +4,14 @@ import { COLORS } from './assets/Maincolors';
 
 
 //결과 데이터 구조
-export interface ReportResult {
-    isComplete: boolean;
+export interface ReportItems{
     report_explain: string;
-    result_detail: string;
+    report_value: any;
 }
 
+export interface ReportResult {
+    [key: string]: ReportItems;
+}
 
 interface ReportModalProps {
     isVisible: boolean;
@@ -20,25 +22,22 @@ interface ReportModalProps {
 const ReportModal = ({isVisible, data, onClose}: ReportModalProps) => {
     if (!data) return null;
     const [currentIndex, setCurrentIndex] = useState(0);
+    const currentKey = `indicator_${currentIndex + 1}`;
+    const currentData = data[currentKey];
+
+
+
     const reportTitles = ["주간 지배 감정", "마음 온도", "감정 롤러코스터", "루틴 효능 랭킹", "마음의 빈자리", "감정 레드 존", "마음 안전망 방어", "마음의 가면", "아픔의 뿌리", "위기 도달 확률"];
-    const parsedData = JSON.parse(data.result_detail);
 
     //카드 위쪽 부분 렌더링
     const RenderCardImg = ({index}: {index: number}) => {
         switch(index){
             case 0:
-                return <View style={[styles.cardImg, { backgroundColor: "blue"}]}><Text style = {{fontSize: 128, textAlign: 'center'}}>{parsedData.result_detail.emoji}</Text></View>
+                return <View style={[styles.cardImg, { backgroundColor: "blue"}]}><Text style = {{fontSize: 128, textAlign: 'center'}}>{currentData.report_value}</Text></View>
             case 1:
-                return <View style={[styles.cardImg, { backgroundColor: "green"}]}><Text style = {{fontSize: 128, textAlign: 'center'}}>{parsedData.result_detail.temperature}</Text></View>
+                return <View style={[styles.cardImg, { backgroundColor: "green"}]}><Text style = {{fontSize: 128, textAlign: 'center'}}>{currentData.report_value.msg}</Text></View>
         }
     }
-
-
-
-
-
-
-
 
     return(
         <Modal transparent = {true} visible={isVisible} animationType='fade' onRequestClose={onClose}>
@@ -49,14 +48,19 @@ const ReportModal = ({isVisible, data, onClose}: ReportModalProps) => {
                     <Text
                         style={{fontSize: 36, fontWeight: 'bold', width: '100%', padding: 4}}
                         numberOfLines={1}
-                        minimumFontScale={0.1}>{reportTitles[0]}</Text>
-                    <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                        <Text style={{ color: 'white',fontSize: 24}}>확인</Text>
+                        minimumFontScale={0.1}>
+                            {reportTitles[currentIndex]}
+                    </Text>
+                    <Text style={{fontSize: 18, marginTop: 8}}>{currentData.report_explain}</Text>
+                    <TouchableOpacity style={styles.closeButton} onPress={()=>{setCurrentIndex(prev=>prev+1)}}>
+                        <Text style={{ color: 'white',fontSize: 24}}>다음</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.closeButton} onPress={()=>{setCurrentIndex(prev=>prev-1)}}>
+                        <Text style={{ color: 'white',fontSize: 24}}>이전</Text>
                     </TouchableOpacity>
                 </View>
             </View>
             </TouchableOpacity>
-            
         </Modal>
     );
 }
