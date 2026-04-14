@@ -115,9 +115,9 @@ function App(){
   return (
     <NavigationContainer>
       <Stack.Navigator>
-        {!user ? (<Stack.Screen name="메인서비스" component = {ServiceScreen} options={{headerShown: false}}/>
+        {user ? (<Stack.Screen name="메인서비스" component = {ServiceScreen} options={{headerShown: false}}/>
         ) :
-        (<Stack.Screen name="로그인" component={LoginScreen}/>)
+        (<Stack.Screen name="로그인" >{(props: any) => <LoginScreen {...props} onLoginSuccess={setUser} />}</Stack.Screen>)
         }
       </Stack.Navigator>
     </NavigationContainer>
