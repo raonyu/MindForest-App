@@ -13,6 +13,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import {BottomBarProvider, useBottomBar} from './BottomBarContext';
 import { useIsFocused } from '@react-navigation/native';
 import { COLORS } from './assets/Maincolors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 //임시 리포트 데이터
 const MOCK_REPORT = {"indicator_1":{"report_explain":"🐢","report_value":"🐢"},"indicator_2":{"report_explain":"현재 마음 온도는 72.5도 지난주보다 15도 높아졌어요","report_value":{"temp":"72.5","msg":"15"}},"indicator_3":{"report_explain":"이번 주 감정의 파동이 적절하게 유지되고 있습니다.","report_value":[{"created_at":"2026-04-01","temp_val":65.2},{"created_at":"2026-04-02","temp_val":70.1},{"created_at":"2026-04-03","temp_val":68.5}]},"indicator_4":{"report_explain":"루틴을 꾸준히 수행한 결과 회복 탄력성이 72.5%로 높게 나타납니다.","report_value":"72.5%"},"indicator_5":{"report_explain":"산책 루틴이 당신의 기분을 가장 빠르게 회복시켜 주었습니다.","report_value":[{"routine":"산책","effect":85},{"routine":"명상","effect":60}]},"indicator_6":{"report_explain":"14일 중 12일 기록 성공","report_value":"12"},"indicator_7":{"report_explain":"루틴 수행 여부에 따라 에너지가 15도 변화하는 패턴이 확인됩니다.","report_value":"15"},"indicator_8":{"report_explain":"🛡️ 이번 주 5번의 급격한 감정 하락 방어","report_value":"5"},"indicator_9":{"report_explain":"🔴 [8, 15, 22]개의 레드존 포인트가 감지되었습니다.","report_value":[8,15,22]},"indicator_10":{"report_explain":"사용자님의 감정점수는 AI 예측과 3.5도 차이가 나요.","report_value":{"user":72.5,"ai":69.0,"gap":3.5}},"indicator_11":{"report_explain":"이번 주 당신을 괴롭힌 키워드는 '업무', '불면', '관계'입니다.","report_value":["업무","불면","관계"]},"indicator_12":{"report_explain":"현재 패턴 유지 시 위기 도달 확률은 27.5%입니다.","report_value":"27.5%"}};
@@ -111,13 +112,40 @@ const ServiceScreen = () => (
 function App(){
   const isDarkMode = useColorScheme() === 'dark';
   const [user, setUser] = useState<any>(null);//사용자 정보 상태
+  const [isLoading, setIsLoading] = useState(true);//로딩 상태 추적
+
+  //사전에 로그인된 데이터가 있는지 채크
+  useEffect(() =>{
+    const checkLoginStatus = async() =>{
+      try{
+        const savedUser = await AsyncStorage.getItem('user_data');
+        if(savedUser) setUser(JSON.parse(savedUser));
+      }catch(e){
+        console.error("데이터 불러오기 실패", e)
+      }finally{
+        setIsLoading(false);
+      }
+    }
+    checkLoginStatus();
+  }, [])
+  //로그인 성공시 데이터 저장
+  const handleLogin = async (userData:any)=>{
+    try{
+      await AsyncStorage.setItem('user_data', JSON.stringify(userData));
+      setUser(userData);
+    }catch(e){console.error("데이터 저장 실패", e)}
+  }
+  const handleLogOut = async () =>{
+    await AsyncStorage.removeItem('user_data');
+    setUser(null);
+  }
 
   return (
     <NavigationContainer>
       <Stack.Navigator>
         {user ? (<Stack.Screen name="메인서비스" component = {ServiceScreen} options={{headerShown: false}}/>
         ) :
-        (<Stack.Screen name="로그인" >{(props: any) => <LoginScreen {...props} onLoginSuccess={setUser} />}</Stack.Screen>)
+        (<Stack.Screen name="로그인" >{(props: any) => <LoginScreen {...props} onLoginSuccess={handleLogin} />}</Stack.Screen>)
         }
       </Stack.Navigator>
     </NavigationContainer>
