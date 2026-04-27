@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import {useState} from 'react';
 import { Animated, StatusBar, StyleSheet, useColorScheme, View, Text, Pressable, TouchableOpacity, FlatList, ListRenderItem, Alert, TextInput} from 'react-native';
+import { COLORS } from './assets/Maincolors';
 
 const LoginScreen = ({ onLoginSuccess }: any) => {
   const [email, setEmail] = useState('');
@@ -23,23 +24,48 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
     }
   }
   return(
-    <View>
-      <Text>로그인 화면</Text>
+    <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+      <Text style={{fontSize: 40, fontWeight: 'bold', marginBottom: 20}}>로그인</Text>
         <TextInput
           placeholder="이메일"
           value={email}
           onChangeText={setEmail}
+          style={styles.inputtext}
         />
         <TextInput
           placeholder="비밀번호"
           value={password}
           onChangeText={setPassword}
           secureTextEntry
+          style={styles.inputtext}
         />
-        <TouchableOpacity onPress={startLogin}>
-          <Text>로그인하기</Text>
+        <TouchableOpacity onPress={startLogin} style={styles.loginButton}>
+          <Text style={{color: 'white', fontSize: 24}}>로그인</Text>
         </TouchableOpacity>
     </View>
   )
 }
+const styles = StyleSheet.create({
+  inputtext: {
+    width: 300,
+    height: 50,
+    borderWidth: 4,
+    borderColor: 'gray',
+    borderRadius: 25,
+    marginBottom: 20,
+    paddingHorizontal: 10
+  },
+  loginButton: {
+    width: 200,
+    height: 56,
+    backgroundColor: COLORS.user,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    alignItems: 'center',
+  }
+
+
+
+});
 export default LoginScreen;
