@@ -50,7 +50,8 @@ const styles = StyleSheet.create({
 	sendButtonText: {
 		color: 'white',
 		fontSize: 20,
-		padding: 10
+		padding: 10,
+		textAlign: 'center'
 
 	}
 })

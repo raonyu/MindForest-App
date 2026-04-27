@@ -1,6 +1,7 @@
 import React, { useState, ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { COLORS } from './assets/Maincolors';
 
 interface CheckboxProps {
   initialValue?: boolean;
@@ -24,29 +25,39 @@ const Checkbox = ({initialValue = false, onCheck, onUncheck, children}:CheckboxP
     return(
         <Pressable
             onPress = {checkboxPress}
-            style={{flexDirection: "row", marginVertical: 5}}
+            style={styles.checkboxContainer}
         >
-            <View style = {[styles.checkboxBase, checked && styles.checkboxChecked]}>
-                {checked && <Ionicons name="checkmark" size={18} color = "white"/>}
-            </View>
+            
             {children && <View style={{marginLeft: 12}}>{children}</View>}
+            <View style = {[styles.checkboxBase, checked && styles.checkboxChecked]}>
+                {checked && <Ionicons name="checkmark" size={40} color = "white"/>}
+            </View>
         </Pressable>
     )
 }
 
 const styles = StyleSheet.create({
+    checkboxContainer:{
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 8,
+        flexDirection: 'row',
+        backgroundColor: COLORS.bar,
+        borderRadius: 11,
+        marginVertical: 8,
+    },
   checkboxBase: {
-    width: 24,
-    height: 24,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: 'coral',
+    borderRadius: 7,
+    borderWidth: 4,
+    borderColor: 'white',
     backgroundColor: 'transparent',
   },
   checkboxChecked: {
-    backgroundColor: 'coral',
+    backgroundColor: "#FFFFFF30",
   },
 });
 
