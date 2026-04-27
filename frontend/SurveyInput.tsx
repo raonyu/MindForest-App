@@ -47,14 +47,19 @@ const styles = StyleSheet.create({
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
+        marginBottom: 28,
     },
     optionItems: {
         flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     itemText:{
         color: 'white',
         fontSize: 24,
-        fontWeight: 300
+        fontWeight: 300,
+        justifyContent: 'center',
+        alignItems: 'center',
     }
 });
 
