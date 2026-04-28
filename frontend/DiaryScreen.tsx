@@ -4,7 +4,7 @@ import { Svg, Circle, Rect, Defs, LinearGradient, Stop } from 'react-native-svg'
 
 // 초기 데이터 (테스트용)
 const initialDiaries: Record<string, string> = {
-  '2026-04-28': '오늘은 하늘이 참 맑았다. 공원에 가서 산책을 했는데, 강아지들이 뛰어노는 모습이 너무 귀여웠다. 소소한 행복을 느낀 하루였다.',
+  '2026-04-28': '오늘은 하늘이 참 맑았다. 공원에 가서 산책을 했는데 강아지들이 뛰어노는 모습이 너무 귀여웠다. 소소한 행복을 느낀 하루였다.',
 };
 
 const simulatedAiComfort = '오늘 하루도 정말 고생 많으셨어요. 당신의 마음이 조금이나마 편안해지기를 바랍니다. 🌿';

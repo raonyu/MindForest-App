@@ -12,7 +12,7 @@ const SurveyInput = ({title, options, onSelect}: {title: string, options: string
                 {options.map((option, index) => (
                     <TouchableOpacity key={index} onPress={() => onSelect(option)}
                         style={styles.optionItems}>
-                        <Text style = {styles.itemText}>{option}</Text>
+                        <Text style = {styles.itemText} minimumFontScale={0.1}>{option}</Text>
                     </TouchableOpacity>
                 ))}
             </View>
@@ -47,14 +47,20 @@ const styles = StyleSheet.create({
         flexDirection: 'column',
         justifyContent: 'center',
         alignItems: 'center',
+        marginBottom: 28,
     },
     optionItems: {
         flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     itemText:{
         color: 'white',
         fontSize: 24,
-        fontWeight: 300
+        fontWeight: 300,
+        justifyContent: 'center',
+        alignItems: 'center',
+        textAlign: 'center',
     }
 });
 

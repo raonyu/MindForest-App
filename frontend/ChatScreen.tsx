@@ -19,13 +19,59 @@ interface Message {
 }
 
 //임시 메세지 데이터들
+/*
 const MOCK_MESSAGES: Message[] = [
     {id: '1', text: "상대방 매세지", sender: 'ai', time: '오전 10:00'},
     {id: '2', text: "나의 메세지", sender: 'user', time: '오전 11:00'},
     //{id: '3', text: `{"type": "select", "title": "질문 내용", "detail": ["옵션1", "옵션2", "옵션3"]}`, sender: 'ai', time: '오전 12:00'},
     {id: '3', text: `{"is_finished": true,"result_emoji": "🐢","result_name": "조용히 숨 고르는 거북이"}`, sender: 'ai', time: '오전 12:00'},
 ];
-
+*/
+const MOCK_MESSAGES: Message[] = [
+  {
+    id: '1',
+    text: '{"type": "select", "title": "1. 아침에 눈을 떴을 때, 오늘 하루의 일정이 꽉 차 있다면?", "detail": ["\\"벌써 기가 빨려...\\" 이불 속으로 다시 들어가고 싶다.", "\\"시간 단위로 쪼개야 해!\\" 머릿속으로 완벽한 시뮬레이션을 돌린다.", "\\"일단 부딪혀!\\" 막상 나가면 어떻게든 흘러가겠지 생각한다."]}',
+    sender: 'ai',
+    time: '오전 10:00'
+  },
+  {
+    id: '2',
+    text: '"벌써 기가 빨려..." 이불 속으로 다시 들어가고 싶다.',
+    sender: 'user',
+    time: '오전 10:01'
+  },
+  {
+    id: '3',
+    text: '{"type": "select", "title": "2. 기분이 갑자기 롤러코스터처럼 오르락내리락할 때 나는?", "detail": ["나도 내 마음을 몰라 혼란스럽고 충동적인 행동을 한다.", "겉으로는 꾹 참고 숨기지만, 속으로는 심장이 쿵쾅거린다.", "감정이 터질 것 같아 주변에 뾰족하게 반응하거나 화를 낸다."]}',
+    sender: 'ai',
+    time: '오전 10:02'
+  },
+  {
+    id: '4',
+    text: '겉으로는 꾹 참고 숨기지만, 속으로는 심장이 쿵쾅거린다.',
+    sender: 'user',
+    time: '오전 10:03'
+  },
+  // ... 중략 (3번 ~ 19번 문항 진행) ...
+  {
+    id: '39',
+    text: '{"type": "select", "title": "20. 마음의 숲에서 내가 찾고 싶은 장소는 어디일까?", "detail": ["아무도 나를 해칠 수 없는 푹신하고 안전한 오두막.", "모든 나무와 꽃이 규칙적으로 정돈된 깔끔한 정원.", "어디로 튈지 모르는 생물들이 가득한 모험의 숲."]}',
+    sender: 'ai',
+    time: '오전 10:20'
+  },
+  {
+    id: '40',
+    text: '아무도 나를 해칠 수 없는 푹신하고 안전한 오두막.',
+    sender: 'user',
+    time: '오전 10:21'
+  },
+  {
+    id: '41',
+    text: '{"is_finished": true, "result_emoji": "🐢", "result_name": "조용히 숨 고르는 거북이"}',
+    sender: 'ai',
+    time: '오전 10:21'
+  }
+];
 
 //채팅 화면 컴포넌트
 const ChatScreen = () => {
@@ -131,14 +177,21 @@ const ChatScreen = () => {
   
   //메세지 렌더링 컴포넌트
   const renderMessages: ListRenderItem<Message> = ({item}: {item: Message}) => {
-    //설문 데이터인지 판별하는거 다시만듬
+    //json 데이터 판별
     let surveyData = null;
-    if (item.sender === 'ai' && item.text.includes(`{"type": "select"`)) {
+    if (item.sender === 'ai' && item.text.includes(`{"type": "select"`)) {//설문데이터일경우
       try {
         surveyData = JSON.parse(item.text);
       } catch (error) {
         console.error('json 파싱 실패', error);
       }
+    }else if (item.sender === 'ai' && item.text.includes(`"is_finished": true`)) {//결과데이터일경우
+        try {
+          surveyData = JSON.parse(item.text);
+          console.log('결과 데이터 파싱 성공', surveyData);
+        } catch (error) {
+          console.error('json 파싱 실패', error);
+        }
     }
 
     return(
@@ -175,10 +228,9 @@ const ChatScreen = () => {
   );
 };
 
+
+
 //스타일 시트
-
-
-
 const styles = StyleSheet.create({
     messageContainer: {//프로필 + 말풍선 컨테이너
         marginVertical: 8,
