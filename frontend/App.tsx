@@ -4,16 +4,23 @@
  *
  * @format
  */
-import React, { useEffect, useRef } from 'react';
-import {useState} from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Animated, StatusBar, StyleSheet, useColorScheme, View, Text, Pressable, TouchableOpacity, FlatList, ListRenderItem} from 'react-native';
-import {NavigationContainer} from '@react-navigation/native';//네비게이션 라이브러리 불러오기
+import {NavigationContainer, useIsFocused} from '@react-navigation/native';
 import {createMaterialTopTabNavigator} from '@react-navigation/material-top-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import {BottomBarProvider, useBottomBar} from './BottomBarContext';
-import { useIsFocused } from '@react-navigation/native';
-import { COLORS } from './assets/Maincolors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import {BottomBarProvider, useBottomBar} from './BottomBarContext';
+import { COLORS } from './assets/Maincolors';
+
+//각 화면 컴포넌트 불러오기
+import LoginScreen from './LoginScreen';
+import ChatScreen from './ChatScreen';
+import DiaryScreen from './DiaryScreen';
+import ReportModal from './ReportModal';
+//기타 컴포넌트 불러오기
+import Checkbox from './Checkbox';
 
 //임시 리포트 데이터
 const MOCK_REPORT = {"indicator_1":{"report_explain":"🐢","report_value":"🐢"},"indicator_2":{"report_explain":"현재 마음 온도는 72.5도 지난주보다 15도 높아졌어요","report_value":{"temp":"72.5","msg":"15"}},"indicator_3":{"report_explain":"이번 주 감정의 파동이 적절하게 유지되고 있습니다.","report_value":[{"created_at":"2026-04-01","temp_val":65.2},{"created_at":"2026-04-02","temp_val":70.1},{"created_at":"2026-04-03","temp_val":68.5}]},"indicator_4":{"report_explain":"루틴을 꾸준히 수행한 결과 회복 탄력성이 72.5%로 높게 나타납니다.","report_value":"72.5%"},"indicator_5":{"report_explain":"산책 루틴이 당신의 기분을 가장 빠르게 회복시켜 주었습니다.","report_value":[{"routine":"산책","effect":85},{"routine":"명상","effect":60}]},"indicator_6":{"report_explain":"14일 중 12일 기록 성공","report_value":"12"},"indicator_7":{"report_explain":"루틴 수행 여부에 따라 에너지가 15도 변화하는 패턴이 확인됩니다.","report_value":"15"},"indicator_8":{"report_explain":"🛡️ 이번 주 5번의 급격한 감정 하락 방어","report_value":"5"},"indicator_9":{"report_explain":"🔴 [8, 15, 22]개의 레드존 포인트가 감지되었습니다.","report_value":[8,15,22]},"indicator_10":{"report_explain":"사용자님의 감정점수는 AI 예측과 3.5도 차이가 나요.","report_value":{"user":72.5,"ai":69.0,"gap":3.5}},"indicator_11":{"report_explain":"이번 주 당신을 괴롭힌 키워드는 '업무', '불면', '관계'입니다.","report_value":["업무","불면","관계"]},"indicator_12":{"report_explain":"현재 패턴 유지 시 위기 도달 확률은 27.5%입니다.","report_value":"27.5"}};
@@ -43,15 +50,6 @@ const BottomBar = () => {
   </Animated.View>
   );
 };
-
-
-//각 화면 컴포넌트 불러오기
-import LoginScreen from './LoginScreen';
-import ChatScreen from './ChatScreen';
-import DiaryScreen from './DiaryScreen';
-import ReportModal from './ReportModal';
-//기타 컴포넌트 불러오기
-import Checkbox from './Checkbox';
 
 
 //메인화면 컴포넌트
@@ -100,10 +98,10 @@ const ServiceScreen = () => (
   <BottomBarProvider>
     <View style={styles.container}>
         <Tab.Navigator initialRouteName = "마음의 숲"
-                      screenOptions={{tabBarStyle: styles.tabBar,
+                       screenOptions={{tabBarStyle: styles.tabBar,
                                       tabBarLabelStyle: {fontSize: 20, fontWeight: 'bold', color: 'black'},
                                       tabBarIndicatorStyle: {backgroundColor: '#00000013', height: 3},
-                                      }}>     
+                                      }}>    
           <Tab.Screen name="감정일기" component={DiaryScreen} />
           <Tab.Screen name="마음의 숲" component={MainScreen} />
           <Tab.Screen name="채팅" component={ChatScreen} />
@@ -149,7 +147,8 @@ function App(){
       <Stack.Navigator>
         {user ? (<Stack.Screen name="메인서비스" component = {ServiceScreen} options={{headerShown: false}}/>
         ) :
-        (<Stack.Screen name="로그인" >{(props: any) => <LoginScreen {...props} onLoginSuccess={handleLogin} />}</Stack.Screen>)
+        /* 1번: 로그인 화면 상단 로그인 간판(헤더) 숨김 처리 */
+        (<Stack.Screen name="로그인" options={{headerShown: false}}>{(props: any) => <LoginScreen {...props} onLoginSuccess={handleLogin} />}</Stack.Screen>)
         }
       </Stack.Navigator>
     </NavigationContainer>
@@ -159,7 +158,7 @@ function App(){
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS?.background || '#FFFFFF',
   },
   bigfont: {
     fontSize: 32,
@@ -172,7 +171,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E4E4E4',
   },
   bottomBar:{
-    backgroundColor: COLORS.bar,
+    backgroundColor: COLORS?.bar || '#000000',
     justifyContent: 'center',
     paddingHorizontal: 20
   },
@@ -189,10 +188,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold'
   }
-
 });
-
-
-
 
 export default App;
