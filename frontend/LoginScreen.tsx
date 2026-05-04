@@ -8,19 +8,39 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
   const [password, setPassword] = useState('');
 
   const MOCK_USER = {
-    id: "user_01",
+    user_id: "user_01",
     email: "asdf",
     password: "1234",
     is_onboarding_done: true,
     user_animal: "거북이",
     assigned_category: "안정형"
   };
-  const startLogin = () =>{
+  const mockStartLogin = () =>{
     if (email === MOCK_USER.email && password === MOCK_USER.password){
       Alert.alert("로그인 성공", `환영합니다, ${MOCK_USER.user_animal}님!`);
       onLoginSuccess(MOCK_USER);
     }else{
       Alert.alert("로그인 실패", "이메일 또는 비밀번호가 올바르지 않습니다.");
+    }
+  }
+  const startLogin = async () =>{
+    try{
+      const responce = await fetch('http://localhost:8000/api/user/api/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id: email, password: password}),
+      });
+      //로그인 실패 처리
+      if (!responce.ok){
+        const errorData = await responce.json();
+        Alert.alert("로그인 실패", errorData.detail);
+        return;
+      }
+      const userData = await responce.json();
+      onLoginSuccess(userData);
+
+    }catch(error){
+      console.error('로그인 실패:', error);
     }
   }
   return(
