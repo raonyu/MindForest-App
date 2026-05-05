@@ -55,9 +55,9 @@ const MainScreen = () => {
 
   //메인 화면 내용
   return (
-  <View style={{backgroundColor: '#D7D6D6', alignItems: 'center'}}>
+  <View style={{flex: 1, backgroundColor: 'transparent', alignItems: 'center'}}>
     <ReportModal isVisible={reportModalVisible} data={MOCK_REPORT} onClose={() => setReportModalVisible(false)}/>
-    <Text style={{fontSize: 24}}>환영합니다 {user.id}님!</Text>
+    <Text style={{fontSize: 24}}>환영합니다 {user.user_id}님!</Text>
     <TouchableOpacity style={styles.baseButton}>
       <Text style={styles.baseButtonText} onPress={() => {navigation.navigate("채팅")}}>
         🌱마음의 숲 사전 테스트 시작하기

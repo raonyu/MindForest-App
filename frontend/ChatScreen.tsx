@@ -8,6 +8,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import { COLORS } from './assets/Maincolors';
 import ResultModal, { SurveyResult } from './ResultModal';
+import { useMainContext } from './MainContext';
 
 
 //메세지 구조 잡기
@@ -81,6 +82,7 @@ const ChatScreen = () => {
   const [surveyResult, setSurveyResult] = useState<SurveyResult | null>(null);
   const [inputText, setInputText] = useState<string>('');
   const [modalVisible, setModalVisible] = useState(false);
+  const {user} = useMainContext();
 
 
   //백앤드 메세지 요청/응답 함수
@@ -93,18 +95,19 @@ const ChatScreen = () => {
       time: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}),
     }
     setMessages(prev => [...prev, userMsg]);
+    //백앤드로 메세지 보내고 응답 받기
     try{
-      const response = await fetch('http://127.0.0.1:8000/docs', {
+      const response = await fetch('http://localhost:8000/api/chatbot/api/chat', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({message: inputText, history: messages}),
+        body: JSON.stringify({user_id: user.user_id, message: inputText}),
       });
        console.log('보냈음', response);
       //ai 응답 후 메세지 보내는 함수
       const aiResponse = await response.json();
       const aimag: Message = {
         id: (MOCK_MESSAGES.length + 1).toString(),
-        text: aiResponse.message,
+        text: aiResponse.reply_message,
         sender: 'ai',
         time: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}),
       };
@@ -164,7 +167,7 @@ const ChatScreen = () => {
       }else{//그 이외에는 일반 채팅을 보여줌
         setBottomBarContent(
           <ChatInput
-          onSend={(inputText) => {sendMessages(inputText);
+          onSend={(inputText) => {handleSendMessage(inputText);
           }}
           />
         );
