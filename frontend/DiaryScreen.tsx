@@ -4,6 +4,8 @@ import {
   TextInput, KeyboardAvoidingView, Platform, ScrollView, Alert 
 } from 'react-native';
 
+import { useMainContext } from './MainContext';
+
 import JoyEmoji from './assets/icons/JoyEmoji';
 import CalmEmoji from './assets/icons/CalmEmoji';
 import SadEmoji from './assets/icons/SadEmoji';
@@ -21,6 +23,8 @@ const EMOTIONS = [
 ];
 
 const DiaryScreen = () => {
+  const { user } = useMainContext();
+
   const realToday = new Date();
   const [currentDateObj, setCurrentDateObj] = useState(new Date());
   
@@ -83,19 +87,43 @@ const DiaryScreen = () => {
     }
   };
 
-  const handleSaveDiary = () => {
+
+  const handleSaveDiary = async () => {
     if (!tempEmotion) {
-      Alert.alert("안내", "먼저 오늘의 감정을 선택해주세요!");
+      Alert.alert("안내", "먼저 오늘의 감정을 선택해주세요.");
       return;
     }
+
     const dateKey = `${currentYear}-${currentMonth}-${selectedDate}`;
-    setDiaries(prev => ({
-      ...prev,
-      [dateKey]: { emotion: tempEmotion, text: diaryText }
-    }));
-    setWriteModalVisible(false);
-    setDetailModalVisible(false);
+
+    try {
+      const response = await fetch('http://localhost:8000/api/diary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user?.user_id,
+          date: dateKey,
+          emotion: tempEmotion,
+          content: diaryText
+        })
+      });
+
+      if (response.ok) {
+        setDiaries(prev => ({
+          ...prev,
+          [dateKey]: { emotion: tempEmotion, text: diaryText }
+        }));
+        setWriteModalVisible(false);
+        setDetailModalVisible(false);
+      } else {
+        Alert.alert("오류", "서버 저장에 실패했습니다.");
+      }
+    } catch (error) {
+      console.error("서버 통신 에러:", error);
+      Alert.alert("오류", "서버와 연결할 수 없습니다.");
+    }
   };
+
 
   const handleDeleteDiary = () => {
     Alert.alert("일기 지우기", "이 날의 기록을 지울까요?", [
