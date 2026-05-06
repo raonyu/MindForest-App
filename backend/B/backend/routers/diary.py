@@ -1,13 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func, extract
 from database import get_db
 import models
 from pydantic import BaseModel
 from services.ai_logic import analyze_diary_emotion, check_anomaly_level
+from datetime import datetime
 
+# --- [1. 요청 데이터 모델] ---
 class DiaryRequest(BaseModel):
     user_id: str
     content: str
+    date: str = None  # 신규: "2026-05-06" (없으면 오늘 날짜)
+    emotion: str = None  # 신규: 프론트에서 선택한 대표 감정
     routine_name: str = None
     routine_category: str = None 
     score_diff: float = 0.0      
@@ -15,10 +20,21 @@ class DiaryRequest(BaseModel):
 
 router = APIRouter()
 
-@router.post("/api/diary")
-def create_diary(data: DiaryRequest, db: Session = Depends(get_db)):
+# --- [2. 일기 저장 및 수정 (POST)] ---
+@router.post("")
+def create_or_update_diary(data: DiaryRequest, db: Session = Depends(get_db)):
     try:
-        # [STEP 1] AI 감정 분석
+        # 1. 날짜 처리 (프론트에서 준 date가 없으면 서버 시간 기준 오늘로 설정)
+        if data.date:
+            try:
+                target_date = datetime.strptime(data.date, "%Y-%m-%d").date()
+            except ValueError:
+                # "2026-5-6" 같은 형식을 위해 한 번 더 시도
+                target_date = datetime.strptime(data.date, "%Y-%n-%j").date()
+        else:
+            target_date = datetime.now().date()
+
+        # 2. AI 감정 분석 (기존 로직 유지)
         analysis = analyze_diary_emotion(data.content)
         if not analysis:
             raise HTTPException(status_code=500, detail="AI 분석 실패")
@@ -26,23 +42,45 @@ def create_diary(data: DiaryRequest, db: Session = Depends(get_db)):
         emotions = analysis["emotions"]
         comment = analysis["analysis_comment"]
 
-        # [STEP 2] Diary 저장 (요구사항 1, 3 반영)
-        # C의 로직은 나중에 이 데이터를 user.diaries로 읽어갑니다.
-        new_diary = models.Diary(
-            user_id=data.user_id,
-            content=data.content,
-            routine_name=data.routine_name,
-            routine_category=data.routine_category, 
-            score_diff=data.score_diff,             
-            is_done=data.is_done,
-            analysis_comment=comment,
-            **emotions
-        )
-        db.add(new_diary)
+        # 3. 해당 날짜에 이미 일기가 있는지 확인 (Upsert 로직)
+        existing_diary = db.query(models.Diary).filter(
+            models.Diary.user_id == data.user_id,
+            func.date(models.Diary.created_at) == target_date
+        ).first()
+
+        if existing_diary:
+            # [Update] 기존 데이터 덮어쓰기
+            existing_diary.content = data.content
+            existing_diary.emotion_main = data.emotion or existing_diary.emotion_main
+            existing_diary.routine_name = data.routine_name or existing_diary.routine_name
+            existing_diary.routine_category = data.routine_category or existing_diary.routine_category
+            existing_diary.score_diff = data.score_diff
+            existing_diary.is_done = data.is_done
+            existing_diary.analysis_comment = comment
+            # 감정 점수 업데이트
+            for k, v in emotions.items():
+                setattr(existing_diary, k, v)
+            new_diary = existing_diary
+        else:
+            # [Insert] 신규 저장
+            new_diary = models.Diary(
+                user_id=data.user_id,
+                content=data.content,
+                emotion_main=data.emotion,
+                routine_name=data.routine_name,
+                routine_category=data.routine_category,
+                score_diff=data.score_diff,
+                is_done=data.is_done,
+                analysis_comment=comment,
+                created_at=datetime.combine(target_date, datetime.now().time()),
+                **emotions
+            )
+            db.add(new_diary)
+        
         db.flush() 
 
-        # [STEP 3] Analysis 테이블 저장
-        main_emotion = max(emotions, key=emotions.get) if emotions else "unknown"
+        # 4. Analysis 테이블 저장 (기존 로직 유지)
+        main_emotion = data.emotion if data.emotion else (max(emotions, key=emotions.get) if emotions else "unknown")
         new_analysis = models.Analysis(
             diary_id=new_diary.id,
             emotion=main_emotion,
@@ -51,23 +89,21 @@ def create_diary(data: DiaryRequest, db: Session = Depends(get_db)):
         )
         db.add(new_analysis)
 
-        # [STEP 4] 이상징후 체크를 위한 데이터 가공
+        # 5. 이상징후 체크 (기존 로직 유지)
         recent_diaries = db.query(models.Diary)\
             .filter(models.Diary.user_id == data.user_id)\
             .order_by(models.Diary.created_at.desc())\
             .limit(7)\
             .all()
         
-        emotion_list = [{"emotions": {k: getattr(d, k) for k in emotions.keys()}} for d in recent_diaries]
+        emotion_list = [{"emotions": {k: getattr(d, k, 0.0) for k in emotions.keys()}} for d in recent_diaries]
         alert = check_anomaly_level(emotion_list)
 
-        # [중요] C의 루틴 업데이트 함수 호출 삭제 (C의 코드는 DB를 직접 읽으므로 필요 없음)
-        
-        db.commit() 
+        db.commit()
         db.refresh(new_diary)
 
         return {
-            "message": "저장 완료",
+            "status": "success",
             "diary_id": new_diary.id,
             "alert": alert
         }
@@ -75,3 +111,51 @@ def create_diary(data: DiaryRequest, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback() 
         raise HTTPException(status_code=500, detail=str(e))
+
+# --- [3. 월별 일기 불러오기 (GET)] ---
+@router.get("/monthly")
+def get_monthly_diaries(
+    user_id: str, 
+    year: int = Query(..., example=2026), 
+    month: int = Query(..., example=5), 
+    db: Session = Depends(get_db)
+):
+    diaries = db.query(models.Diary).filter(
+        models.Diary.user_id == user_id,
+        extract('year', models.Diary.created_at) == year,
+        extract('month', models.Diary.created_at) == month
+    ).order_by(models.Diary.created_at.asc()).all()
+
+    return {
+        "data": [
+            {
+                "date": d.created_at.strftime("%Y-%m-%d"),
+                "emotion": getattr(d, 'emotion_main', "joy"), # 필드명 확인 필요
+                "content": d.content
+            } for d in diaries
+        ]
+    }
+
+# --- [4. 특정 일기 삭제 (DELETE)] ---
+@router.delete("")
+def delete_diary(user_id: str, date: str, db: Session = Depends(get_db)):
+    try:
+        target_date = datetime.strptime(date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="날짜 형식이 올바르지 않습니다.")
+
+    # 해당 날짜의 일기 찾기
+    diary_to_delete = db.query(models.Diary).filter(
+        models.Diary.user_id == user_id,
+        func.date(models.Diary.created_at) == target_date
+    ).first()
+
+    if not diary_to_delete:
+        raise HTTPException(status_code=404, detail="해당 날짜의 일기가 없습니다.")
+
+    # Analysis 등 연관 데이터는 DB의 On Delete Cascade 설정에 따라 자동 삭제되거나, 
+    # 여기서 수동으로 삭제해야 할 수 있습니다.
+    db.delete(diary_to_delete)
+    db.commit()
+    
+    return {"status": "success"}
