@@ -14,7 +14,7 @@ import MainContext from './MainContext';
 
 import { COLORS } from './assets/Maincolors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import LinearGradient from 'react-native-linear-gradient';
+import {LinearGradient} from 'expo-linear-gradient';
 
 import Svg, { Defs, Pattern, Rect, Path as SvgPath } from 'react-native-svg';
 
