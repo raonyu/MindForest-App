@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, Text, StyleSheet, TouchableOpacity, Modal, 
   TextInput, KeyboardAvoidingView, Platform, ScrollView, Alert 
@@ -21,6 +21,8 @@ const EMOTIONS = [
   { id: 'anxiety', color: '#FF6187', icon: AnxiousEmoji },
   { id: 'crying', color: '#E961FF', icon: CryingEmoji },
 ];
+
+const API_BASE_URL = Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000';
 
 const DiaryScreen = () => {
   const { user } = useMainContext();
@@ -47,6 +49,35 @@ const DiaryScreen = () => {
   const [tempEmotion, setTempEmotion] = useState<string | null>(null);
   const [diaryText, setDiaryText] = useState('');
 
+  // [GET] 달(Month)이 바뀔 때마다 서버에서 일기 데이터 불러오기
+  const fetchMonthlyDiaries = async () => {
+    if (!user?.user_id) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/diary/monthly?user_id=${user.user_id}&year=${currentYear}&month=${currentMonth}`);
+      
+      if (response.ok) {
+        const result = await response.json();
+        const loadedDiaries: Record<string, { emotion: string, text: string }> = {};
+        
+        // 서버에서 받아온 데이터를 화면 달력 형식에 맞게 변환
+        if (result.data) {
+          result.data.forEach((item: any) => {
+            loadedDiaries[item.date] = { emotion: item.emotion, text: item.content };
+          });
+        }
+        setDiaries(loadedDiaries);
+      }
+    } catch (error) {
+      console.error("일기 불러오기 실패:", error);
+    }
+  };
+
+  // 연/월이 바뀌거나 유저 정보가 들어올 때 즉시 실행
+  useEffect(() => {
+    fetchMonthlyDiaries();
+  }, [currentYear, currentMonth, user?.user_id]);
+
   const goToPrevMonth = () => {
     setCurrentDateObj(new Date(currentYear, currentMonth - 2, 1));
     setSelectedDate(null);
@@ -59,7 +90,9 @@ const DiaryScreen = () => {
 
   const handleDayPress = (day: number) => {
     setSelectedDate(day);
-    const dateKey = `${currentYear}-${currentMonth}-${day}`;
+    const mm = String(currentMonth).padStart(2, '0');
+    const dd = String(day).padStart(2, '0');
+    const dateKey = `${currentYear}-${mm}-${dd}`; // 💡 포맷 변경
     const existingDiary = diaries[dateKey];
     
     if (existingDiary) {
@@ -74,34 +107,32 @@ const DiaryScreen = () => {
 
   const handleSelectEmotion = (emoId: string) => {
     setTempEmotion(emoId);
-    
-    if (selectedDate !== null) {
-      const dateKey = `${currentYear}-${currentMonth}-${selectedDate}`;
-      setDiaries(prev => ({
-        ...prev,
-        [dateKey]: { 
-          emotion: emoId, 
-          text: prev[dateKey]?.text || '' 
-        }
-      }));
-    }
   };
 
-
+  // [POST] 일기 서버에 저장하기
   const handleSaveDiary = async () => {
     if (!tempEmotion) {
       Alert.alert("안내", "먼저 오늘의 감정을 선택해주세요.");
       return;
     }
 
-    const dateKey = `${currentYear}-${currentMonth}-${selectedDate}`;
+    // 💡 1. 추가된 부분: user_id가 확실히 있는지 먼저 검사합니다.
+    if (!user || !user.user_id) {
+      Alert.alert("오류", "유저 정보가 없습니다. 다시 로그인해주세요.");
+      return;
+    }
 
-    try {
-      const response = await fetch('http://localhost:8000/api/diary', {
+    // 💡 2. 수정된 부분: 백엔드 에러 방지를 위해 날짜를 무조건 2자리(05-06)로 맞춰줍니다.
+    const mm = String(currentMonth).padStart(2, '0');
+    const dd = String(selectedDate).padStart(2, '0');
+    const dateKey = `${currentYear}-${mm}-${dd}`;
+
+      try {
+      const response = await fetch(`${API_BASE_URL}/api/diary`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id: user?.user_id,
+          user_id: user.user_id, // 이제 안전하게 전송됩니다.
           date: dateKey,
           emotion: tempEmotion,
           content: diaryText
@@ -109,6 +140,7 @@ const DiaryScreen = () => {
       });
 
       if (response.ok) {
+        // 성공 시 팝업 없이 부드럽게 달력 업데이트 및 모달 닫기
         setDiaries(prev => ({
           ...prev,
           [dateKey]: { emotion: tempEmotion, text: diaryText }
@@ -124,19 +156,35 @@ const DiaryScreen = () => {
     }
   };
 
-
+  // [DELETE] 일기 진짜 삭제하기
   const handleDeleteDiary = () => {
     Alert.alert("일기 지우기", "이 날의 기록을 지울까요?", [
       { text: "취소", style: "cancel" },
       { 
         text: "지우기", 
         style: "destructive",
-        onPress: () => {
-          const dateKey = `${currentYear}-${currentMonth}-${selectedDate}`;
-          const newDiaries = { ...diaries };
-          delete newDiaries[dateKey];
-          setDiaries(newDiaries);
-          setDetailModalVisible(false);
+        onPress: async () => {
+          const mm = String(currentMonth).padStart(2, '0');
+          const dd = String(selectedDate).padStart(2, '0');
+          const dateKey = `${currentYear}-${mm}-${dd}`; // 💡 포맷 변경
+          
+          try {
+            const response = await fetch(`${API_BASE_URL}/api/diary?user_id=${user.user_id}&date=${dateKey}`, {
+              method: 'DELETE'
+            });
+
+            if (response.ok) {
+              const newDiaries = { ...diaries };
+              delete newDiaries[dateKey];
+              setDiaries(newDiaries);
+              setDetailModalVisible(false);
+            } else {
+              Alert.alert("오류", "서버에서 일기를 삭제하지 못했어요.");
+            }
+          } catch (error) {
+            console.error("삭제 통신 에러:", error);
+            Alert.alert("오류", "서버와 연결할 수 없습니다.");
+          }
         }
       }
     ]);
@@ -197,7 +245,9 @@ const DiaryScreen = () => {
 
           <View style={styles.daysGrid}>
             {calendarDays.map((day, index) => {
-              const dateKey = day !== null ? `${currentYear}-${currentMonth}-${day}` : '';
+              const mm = String(currentMonth).padStart(2, '0');
+              const dd = String(day).padStart(2, '0');
+              const dateKey = day !== null ? `${currentYear}-${mm}-${dd}` : '';
               const diaryEntry = day !== null ? diaries[dateKey] : null;
               
               const isToday = day !== null && isCurrentMonth && day === realToday.getDate();
