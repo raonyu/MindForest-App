@@ -43,6 +43,8 @@ class Diary(Base):
 
     is_done = Column(Boolean, default=False)
 
+    emotion = Column(String, nullable=True)
+
     # 8가지 감정 수치
     joy = Column(Float, default=0.0)
     sadness = Column(Float, default=0.0)
