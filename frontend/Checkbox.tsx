@@ -1,5 +1,5 @@
 import React, { useState, ReactNode } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from './assets/Maincolors';
 
@@ -28,7 +28,16 @@ const Checkbox = ({initialValue = false, onCheck, onUncheck, children}:CheckboxP
             style={styles.checkboxContainer}
         >
             
-            {children && <View style={{marginLeft: 12}}>{children}</View>}
+            {children && (
+                <Text
+                    style={{marginLeft: 12, flex: 1, fontSize: 24, color: 'white'}}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
+                >
+                    {children}
+                </Text>
+            )}
             <View style = {[styles.checkboxBase, checked && styles.checkboxChecked]}>
                 {checked && <Ionicons name="checkmark" size={40} color = "white"/>}
             </View>

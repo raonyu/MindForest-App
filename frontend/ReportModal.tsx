@@ -22,8 +22,19 @@ interface ReportModalProps {
 }
 
 const ReportModal = ({isVisible, data, onClose}: ReportModalProps) => {
-    if (!data) return null;
     const [currentIndex, setCurrentIndex] = useState(0);
+    if (!data) {
+        return(
+            <Modal transparent={true} visible={isVisible} animationType='fade' onRequestClose={onClose}>
+                <TouchableOpacity style={styles.overlay} activeOpacity={1} onPressOut={onClose}>
+                    <View style={styles.emptyCard}>
+                        <Text style={styles.emptyText}>데이터가 없습니다</Text>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
+        );
+    }
+
     const currentKey = `indicator_${currentIndex + 1}`;
     const currentData = data[currentKey];
 
@@ -217,6 +228,20 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderRadius: 28,
+    },
+    emptyCard: {
+        width: 336,
+        height: 220,
+        borderRadius: 26,
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 24,
+    },
+    emptyText: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#333333',
     }
 
 });

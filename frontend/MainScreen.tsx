@@ -16,7 +16,7 @@ interface currentData{
   user_animal: string | null;
   assigned_category: string | null;
   signup_date: string;
-  weekly_analysis: ReportResult | null;
+  weekly_analysis: ReportResult | { status: 'no_data' } | null;
   recommendations: string[];
 }
 //백엔드에서 데이터 불러오기
@@ -64,6 +64,11 @@ const fetchEmotionData = async (userID: string): Promise<emotionData | null> => 
         return null;
     }
 }
+const normalizeWeeklyAnalysis = (weeklyAnalysis: currentData['weekly_analysis']): ReportResult | null => {
+  if (!weeklyAnalysis) return null;
+  if ((weeklyAnalysis as { status?: string }).status === 'no_data') return null;
+  return weeklyAnalysis as ReportResult;
+};
 const Routines = ({routines}: {routines: string[]|undefined})=>{
     return(
         <View style={{alignItems: 'center', margin: 40}}>
@@ -86,6 +91,30 @@ const MainScreen = () => {
   const {handleLogOut, user} = useMainContext();
   const [currentUserData, setCurrentUserData] = useState<currentData | null>(null);
   const [emotionMessage, setEmotionMessage] = useState<emotionData | null>(null);
+  const reportData = normalizeWeeklyAnalysis(currentUserData?.weekly_analysis ?? null);
+
+  const requestSurvey = async () => {
+    try {
+      const surveyType = 'DEPRESSION';
+      const response = await fetch(`http://localhost:8000/api/survey/api/survey/${surveyType}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        Alert.alert('사전 테스트 요청 실패', errorData.detail || '서버 오류');
+        return;
+      }
+
+      const data = await response.json();
+      console.log('사전 테스트 문항 응답:', data);
+      Alert.alert('요청 성공', '설문 GET 요청을 보냈습니다.');
+    } catch (error) {
+      console.error('사전 테스트 요청 실패:', error);
+      Alert.alert('사전 테스트 요청 실패', '네트워크 오류');
+    }
+  };
 
   //유저데이터 불러오기
   useEffect(() => {
@@ -117,10 +146,10 @@ const MainScreen = () => {
   //메인 화면 내용
   return (
   <View style={{flex: 1, backgroundColor: 'transparent', alignItems: 'center'}}>
-    <ReportModal isVisible={reportModalVisible} data={MOCK_REPORT} onClose={() => setReportModalVisible(false)}/>
+    <ReportModal isVisible={reportModalVisible} data={reportData ?? null/*MOCK_REPORT*/} onClose={() => setReportModalVisible(false)}/>
     <Text style={{fontSize: 24}}>환영합니다 {user.user_id}님!</Text>
     <Text style={{fontSize: 12, textAlign: 'center'}}>{emotionMessage?.message}</Text>
-    <TouchableOpacity style={styles.baseButton} onPress={() => {navigation.navigate("채팅", { startSurvey: { surveyType: 'DEPRESSION' } })}}>
+    <TouchableOpacity style={styles.baseButton} onPress={() => { navigation.navigate("채팅"); requestSurvey(); }}>
       <Text style={styles.baseButtonText}>
           🌱마음의 숲 사전 테스트 시작하기
       </Text>
@@ -148,6 +177,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold'
   },
   baseButton: {
+    fontFamily: 'NanumSquareRoundB',
     width: 400,
     borderRadius: 28,
     backgroundColor: COLORS.user,
