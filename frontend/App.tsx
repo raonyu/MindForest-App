@@ -5,7 +5,7 @@
  * @format
  */
 import React, { useEffect, useRef , createContext, useContext, useState} from 'react';
-import { Animated, StatusBar, StyleSheet, useColorScheme, View, Text, Pressable, TouchableOpacity, FlatList, ListRenderItem, Platform} from 'react-native';
+import { Animated, StatusBar, StyleSheet, useColorScheme, View, Text, Pressable, TouchableOpacity, FlatList, ListRenderItem, Platform, Keyboard } from 'react-native';
 import {NavigationContainer} from '@react-navigation/native';
 import {createMaterialTopTabNavigator} from '@react-navigation/material-top-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -31,6 +31,7 @@ const Stack = createStackNavigator();
 const BottomBar = () => {
   const { BottomBar:content } = useBottomBar();
   const yPosAnim = useRef(new Animated.Value(100)).current;
+  const keyboardAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (content){
@@ -40,10 +41,24 @@ const BottomBar = () => {
     }
   }, [content]);
 
+  // 키보드 이벤트로 바 위치 보정
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (e: any) => {
+      const h = e.endCoordinates ? e.endCoordinates.height : 300;
+      Animated.timing(keyboardAnim, {toValue: -h, duration: 200, useNativeDriver: true}).start();
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      Animated.timing(keyboardAnim, {toValue: 0, duration: 200, useNativeDriver: true}).start();
+    });
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
+
   if (!content) return null;
 
   return (
-  <Animated.View style={[styles.bottomBar, {transform: [{translateY: yPosAnim}]}]}>
+  <Animated.View style={[styles.bottomBar, {transform: [{translateY: Animated.add(yPosAnim, keyboardAnim)}]}]}>
     {content}
   </Animated.View>
   );
@@ -168,10 +183,13 @@ function App(){
     <MainContext.Provider value={{user, setUser, handleLogOut}}>
       <NavigationContainer>
         <Stack.Navigator>
-          {user ? (<Stack.Screen name="메인서비스" component = {ServiceScreen} options={{headerShown: false}}/>
-          ) :
-          (<Stack.Screen name="로그인" >{(props: any) => <LoginScreen {...props} onLoginSuccess={handleLogin} />}</Stack.Screen>)
-          }
+          {user ? (
+            <>
+              <Stack.Screen name="메인서비스" component = {ServiceScreen} options={{headerShown: false}}/>
+            </>
+          ) : (
+            <Stack.Screen name="로그인" >{(props: any) => <LoginScreen {...props} onLoginSuccess={handleLogin} />}</Stack.Screen>
+          )}
         </Stack.Navigator>
       </NavigationContainer>
     </MainContext.Provider>
@@ -196,9 +214,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#E4E4E4',
   },
   bottomBar:{
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: COLORS.bar,
     justifyContent: 'center',
-    paddingHorizontal: 20
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    minHeight: 70,
+    zIndex: 50,
   },
   bottomTitleContainer: {
     backgroundColor: '#00000030',

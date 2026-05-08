@@ -120,9 +120,9 @@ const MainScreen = () => {
     <ReportModal isVisible={reportModalVisible} data={MOCK_REPORT} onClose={() => setReportModalVisible(false)}/>
     <Text style={{fontSize: 24}}>환영합니다 {user.user_id}님!</Text>
     <Text style={{fontSize: 12, textAlign: 'center'}}>{emotionMessage?.message}</Text>
-    <TouchableOpacity style={styles.baseButton}>
-      <Text style={styles.baseButtonText} onPress={() => {navigation.navigate("채팅")}}>
-        🌱마음의 숲 사전 테스트 시작하기
+    <TouchableOpacity style={styles.baseButton} onPress={() => {navigation.navigate("채팅", { startSurvey: { surveyType: 'DEPRESSION' } })}}>
+      <Text style={styles.baseButtonText}>
+          🌱마음의 숲 사전 테스트 시작하기
       </Text>
     </TouchableOpacity>
     <TouchableOpacity

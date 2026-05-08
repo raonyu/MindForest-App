@@ -1,6 +1,7 @@
-import React, { useEffect, useReducer } from 'react';
+import React, { useEffect, useReducer, useRef } from 'react';
 import {useState} from 'react';
-import {StyleSheet,View, Text, Button, TextInput ,FlatList, ListRenderItem, Image,} from 'react-native';
+import { useRoute } from '@react-navigation/native';
+import {StyleSheet,View, Text, Button, TextInput ,FlatList, ListRenderItem, Image, Keyboard, Platform} from 'react-native';
 import {BottomBarProvider, useBottomBar} from './BottomBarContext';
 import ChatInput from './ChatInput';
 import SurveyInput from './SurveyInput';
@@ -78,6 +79,7 @@ const MOCK_MESSAGES: Message[] = [
 const ChatScreen = () => {
   const isFocused = useIsFocused();//현재 화면이 포커스 되어있는지 확인
   const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
+  const route: any = useRoute();
   const lastMessage = messages[messages.length - 1];//마지막 메세지 가져오기
   const [surveyResult, setSurveyResult] = useState<SurveyResult | null>(null);
   const [inputText, setInputText] = useState<string>('');
@@ -177,6 +179,30 @@ const ChatScreen = () => {
     }
   }, [isFocused, messages]);//포커싱, 메세지 데이터 여부에 따라 재랜더링
 
+  // 키보드 이벤트: 키보드가 열리면 FlatList가 위로 올라가도록 패딩 조정
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, (e: any) => {
+      setKeyboardHeight(e.endCoordinates ? e.endCoordinates.height : 300);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  // 새 메시지 추가 시 자동 스크롤
+  useEffect(() => {
+    if (flatListRef.current) {
+      try{
+        // @ts-ignore
+        flatListRef.current.scrollToEnd({ animated: true });
+      }catch(e){/* ignore */}
+    }
+  }, [messages, keyboardHeight]);
+
   
   //메세지 렌더링 컴포넌트
   const renderMessages: ListRenderItem<Message> = ({item}: {item: Message}) => {
@@ -225,6 +251,11 @@ const ChatScreen = () => {
       data={messages}
       renderItem= {renderMessages}
       keyExtractor={item => item.id}
+      style={styles.list}
+      contentContainerStyle={[styles.listContent, {paddingBottom: 24 + keyboardHeight}]}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="interactive"
+      ref={(ref) => { /* @ts-ignore */ flatListRef.current = ref }}
     />
     <ResultModal isVisible={modalVisible} data={surveyResult} onClose={() => setModalVisible(false)}/>
   </View>
@@ -235,6 +266,24 @@ const ChatScreen = () => {
 
 //스타일 시트
 const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      paddingBottom: 100, // 하단바가 고정일 때 내용이 가려지지 않도록 여유를 둠
+    },
+    screenTitle: {
+      fontSize: 14,
+      color: '#333',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    list: {
+      flex: 1,
+    },
+    listContent: {
+      paddingHorizontal: 8,
+      paddingTop: 8,
+      paddingBottom: 24,
+    },
     messageContainer: {//프로필 + 말풍선 컨테이너
         marginVertical: 8,
         marginHorizontal: 16,
@@ -245,9 +294,11 @@ const styles = StyleSheet.create({
     messageBubble: {//공통 말풍선 스타일
         borderRadius: 12,
         paddingHorizontal: 16,
-        paddingVertical: 4,
+        paddingVertical: 8,
         shadowOffset: {width: 0, height: 2},
-        bottom: 12
+        marginVertical: 4,
+        maxWidth: '75%',
+        flexShrink: 1,
     },
     profileImage:{
       width: 64,
@@ -255,8 +306,10 @@ const styles = StyleSheet.create({
       borderRadius: 32,
     },
     userText: {
-        fontSize: 16,
-        color: 'white'
+      fontSize: 16,
+      color: 'white',
+      flexWrap: 'wrap',
+      flexShrink: 1,
     },
     userChatting: {
         flexDirection: 'row',
@@ -287,8 +340,10 @@ const styles = StyleSheet.create({
     },
 
     otherText: {
-        fontSize: 16,
-        color: 'black'
+      fontSize: 16,
+      color: 'black',
+      flexWrap: 'wrap',
+      flexShrink: 1,
     },
     otherChatting: {
         flexDirection: 'row-reverse',
