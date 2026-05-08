@@ -20,6 +20,8 @@ interface Message {
   time: string;
 }
 
+
+
 //임시 메세지 데이터들
 /*
 const MOCK_MESSAGES: Message[] = [
@@ -81,10 +83,13 @@ const ChatScreen = () => {
   const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
   const route: any = useRoute();
   const lastMessage = messages[messages.length - 1];//마지막 메세지 가져오기
+  const flatListRef = useRef<FlatList<Message> | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState<number>(0);
   const [surveyResult, setSurveyResult] = useState<SurveyResult | null>(null);
   const [inputText, setInputText] = useState<string>('');
   const [modalVisible, setModalVisible] = useState(false);
   const {user} = useMainContext();
+
 
 
   //백앤드 메세지 요청/응답 함수
@@ -127,7 +132,9 @@ const ChatScreen = () => {
       time: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}),
     };
     setMessages(prevMessages => [...prevMessages, newMessage]);
+
   };
+
 
   //설문데이터인지 판별하는 함수
   const getsurveyData = () => {
@@ -144,6 +151,7 @@ const ChatScreen = () => {
       return null;
   };
 
+  
   //설문조사 데이터, 결과 등의 데이터 여부에 따라 이벤트 처리
   const { setBottomBarContent } = useBottomBar();
   useEffect(() => {
@@ -245,8 +253,8 @@ const ChatScreen = () => {
 
   //최종 스크린 보여주기
   return (
-  <View>
-    <Text>채팅 화면이 뜰겁니다</Text>
+  <View style={styles.container}>
+    <Text style={styles.screenTitle}>채팅 화면</Text>
     <FlatList<Message>
       data={messages}
       renderItem= {renderMessages}
@@ -373,9 +381,5 @@ const styles = StyleSheet.create({
         borderBottomColor: COLORS.other,
     }
 });
-
-
-
-
 
 export default ChatScreen;
