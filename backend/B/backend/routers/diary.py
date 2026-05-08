@@ -24,13 +24,9 @@ router = APIRouter()
 @router.post("")
 def create_or_update_diary(data: DiaryRequest, db: Session = Depends(get_db)):
     try:
-        # 1. 날짜 처리 (프론트에서 준 date가 없으면 서버 시간 기준 오늘로 설정)
+        # 1. 날짜 처리 (프론트에서 항상 YYYY-MM-DD 형식으로 옴)
         if data.date:
-            try:
-                target_date = datetime.strptime(data.date, "%Y-%m-%d").date()
-            except ValueError:
-                # "2026-5-6" 같은 형식을 위해 한 번 더 시도
-                target_date = datetime.strptime(data.date, "%Y-%n-%j").date()
+            target_date = datetime.strptime(data.date, "%Y-%m-%d").date()
         else:
             target_date = datetime.now().date()
 
@@ -51,7 +47,7 @@ def create_or_update_diary(data: DiaryRequest, db: Session = Depends(get_db)):
         if existing_diary:
             # [Update] 기존 데이터 덮어쓰기
             existing_diary.content = data.content
-            existing_diary.emotion_main = data.emotion or existing_diary.emotion_main
+            existing_diary.emotion = data.emotion or existing_diary.emotion
             existing_diary.routine_name = data.routine_name or existing_diary.routine_name
             existing_diary.routine_category = data.routine_category or existing_diary.routine_category
             existing_diary.score_diff = data.score_diff
@@ -66,7 +62,7 @@ def create_or_update_diary(data: DiaryRequest, db: Session = Depends(get_db)):
             new_diary = models.Diary(
                 user_id=data.user_id,
                 content=data.content,
-                emotion_main=data.emotion,
+                emotion=data.emotion,
                 routine_name=data.routine_name,
                 routine_category=data.routine_category,
                 score_diff=data.score_diff,
@@ -130,7 +126,7 @@ def get_monthly_diaries(
         "data": [
             {
                 "date": d.created_at.strftime("%Y-%m-%d"),
-                "emotion": getattr(d, 'emotion_main', "joy"), # 필드명 확인 필요
+                "emotion": getattr(d, 'emotion', "joy"), # 필드명 확인 필요
                 "content": d.content
             } for d in diaries
         ]
