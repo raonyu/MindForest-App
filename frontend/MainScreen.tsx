@@ -75,10 +75,8 @@ const Routines = ({routines}: {routines: string[]|undefined})=>{
             <Text style={{fontSize: 20, fontWeight:'semibold'}}>오늘의 루틴</Text>
             <View style={styles.routineContainer}>
                 {routines?.map((routine, index) => (
-                        <Checkbox key={index}>
-                            <Text style={{fontSize: 24, color: 'white'}}>{routine}</Text>
-                        </Checkbox>
-                    ))}
+                    <Checkbox key={index}><Text style={{color: 'black', fontSize: 16}}>{routine}</Text></Checkbox>
+                  ))}
             </View>
         </View>)
 }; 
@@ -180,16 +178,21 @@ const styles = StyleSheet.create({
     fontFamily: 'NanumSquareRoundB',
     width: 400,
     borderRadius: 28,
-    backgroundColor: COLORS.user,
+    backgroundColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 40,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
   },
   baseButtonText: {
-    color: 'white',
-    fontSize: 24,
+    color: 'black',
+    fontSize: 16,
     marginVertical: 12,
     marginHorizontal: 20
+
   },
   tabBar: {
     backgroundColor: '#E4E4E4',
@@ -214,9 +217,15 @@ const styles = StyleSheet.create({
   },
   routineContainer: {
     padding: 20,
-    borderWidth: 4,
-    borderRadius: 32,
-    borderColor: COLORS.user,
+    //borderWidth: 4,
+    //borderRadius: 32,
+    //borderColor: COLORS.user,
+    width: 400,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
   }
 
 

@@ -30,7 +30,7 @@ const Checkbox = ({initialValue = false, onCheck, onUncheck, children}:CheckboxP
             
             {children && (
                 <Text
-                    style={{marginLeft: 12, flex: 1, fontSize: 24, color: 'white'}}
+                    style={{marginLeft: 12, flex: 1, fontSize: 12, color: 'black'}}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.7}
@@ -39,7 +39,7 @@ const Checkbox = ({initialValue = false, onCheck, onUncheck, children}:CheckboxP
                 </Text>
             )}
             <View style = {[styles.checkboxBase, checked && styles.checkboxChecked]}>
-                {checked && <Ionicons name="checkmark" size={40} color = "white"/>}
+                {checked && <Ionicons name="checkmark" size={40} color = "black"/>}
             </View>
         </Pressable>
     )
@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 7,
     borderWidth: 4,
-    borderColor: 'white',
+    borderColor: 'black',
     backgroundColor: 'transparent',
   },
   checkboxChecked: {
