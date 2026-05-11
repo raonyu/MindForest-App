@@ -25,7 +25,7 @@ const EMOTIONS = [
 const API_BASE_URL = Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000';
 
 const DiaryScreen = () => {
-  const { user } = useMainContext();
+  const { user, handleLogOut } = useMainContext();
 
   const realToday = new Date();
   const [currentDateObj, setCurrentDateObj] = useState(new Date());
@@ -470,8 +470,8 @@ const styles = StyleSheet.create({
     color: '#2a3a21', 
   },
   monthText: {
-    fontFamily: 'NanumSquareRoundB',
-    fontSize: 22,
+    fontFamily: 'ownglyph',
+    fontSize: 26,
     color: '#2a3a21',
   },
   weekRow: {

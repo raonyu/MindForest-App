@@ -14,7 +14,7 @@ import MainContext from './MainContext';
 
 import { COLORS } from './assets/Maincolors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {LinearGradient} from 'expo-linear-gradient';
+import LinearGradient from 'react-native-linear-gradient';
 
 import Svg, { Defs, Pattern, Rect, Path as SvgPath } from 'react-native-svg';
 
@@ -188,7 +188,7 @@ function App(){
               <Stack.Screen name="메인서비스" component = {ServiceScreen} options={{headerShown: false}}/>
             </>
           ) : (
-            <Stack.Screen name="로그인" >{(props: any) => <LoginScreen {...props} onLoginSuccess={handleLogin} />}</Stack.Screen>
+            <Stack.Screen name="로그인" options={{headerShown: false}}>{(props: any) => <LoginScreen {...props} onLoginSuccess={handleLogin} />}</Stack.Screen>
           )}
         </Stack.Navigator>
       </NavigationContainer>
