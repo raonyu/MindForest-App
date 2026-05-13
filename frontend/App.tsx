@@ -64,11 +64,18 @@ const BottomBar = () => {
   );
 };
 
-// 커스텀 탭바 컴포넌트
+
+// 커스텀 탭바 컴포넌트 (밝은 애플 리퀴드 글래스 버전 🍎)
 const CustomTopTabBar = ({ state, descriptors, navigation }: any) => {
   return (
     <View style={customTabStyles.wrapper}>
-      <View style={customTabStyles.container}>
+      {/* 💡 하얀색의 농도(Opacity)를 70~95%로 대폭 끌어올려서 어둡지 않고 뽀얀 유리 질감으로 변경! */}
+      <LinearGradient
+        colors={['rgba(255, 255, 255, 0.95)', 'rgba(255, 255, 255, 0.7)', 'rgba(255, 255, 255, 0.9)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={customTabStyles.glassContainer}
+      >
         {state.routes.map((route: any, index: number) => {
           const { options } = descriptors[route.key];
           const label = options.tabBarLabel !== undefined ? options.tabBarLabel : options.title !== undefined ? options.title : route.name;
@@ -89,7 +96,7 @@ const CustomTopTabBar = ({ state, descriptors, navigation }: any) => {
           return (
             <TouchableOpacity
               key={index}
-              activeOpacity={0.9}
+              activeOpacity={0.8}
               onPress={onPress}
               style={customTabStyles.tabButton}
             >
@@ -110,10 +117,11 @@ const CustomTopTabBar = ({ state, descriptors, navigation }: any) => {
             </TouchableOpacity>
           );
         })}
-      </View>
+      </LinearGradient>
     </View>
   );
 };
+
 
 //마음의 숲 서비스 전체 서비스 화면
 const ServiceScreen = () => (
@@ -240,6 +248,7 @@ const styles = StyleSheet.create({
   }
 });
 
+
 const customTabStyles = StyleSheet.create({
   wrapper: {
     backgroundColor: 'transparent', 
@@ -247,18 +256,19 @@ const customTabStyles = StyleSheet.create({
     paddingBottom: 15,
     alignItems: 'center',
   },
-  container: {
+  glassContainer: {
     flexDirection: 'row',
     width: '90%',
     height: 52,
-    backgroundColor: '#ffffff', 
     borderRadius: 26,
     padding: 6, 
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1, // 💡 테두리를 살짝 더 두껍게 해서 유리의 두께감 표현
+    borderColor: '#FFFFFF', // 💡 반투명이 아닌 100% 쨍한 흰색 테두리로 빛 반사(하이라이트) 극대화
+    shadowColor: '#8E9E82',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 15,
+    elevation: 5,
   },
   tabButton: {
     flex: 1, 
@@ -268,6 +278,10 @@ const customTabStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 20, 
+    shadowColor: '#9ee779',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   inactiveTab: {
     flex: 1,
@@ -278,13 +292,14 @@ const customTabStyles = StyleSheet.create({
   activeTabText: {
     fontFamily: 'NanumSquareRoundB', 
     fontSize: 15,
-    color: '#2a3a21', 
+    color: '#15210f', 
   },
   inactiveTabText: {
-    fontFamily: 'NanumSquareRoundR',
+    fontFamily: 'NanumSquareRoundB', 
     fontSize: 15,
-    color: '#9e9e9e', 
+    color: '#658a4e', 
   }
 });
+
 
 export default App;
