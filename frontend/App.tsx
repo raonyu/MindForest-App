@@ -64,11 +64,17 @@ const BottomBar = () => {
   );
 };
 
-// 커스텀 탭바 컴포넌트
+// 💡 커스텀 탭바 컴포넌트 (1px 테두리 얇은 리퀴드 글래스 버전 🍎)
 const CustomTopTabBar = ({ state, descriptors, navigation }: any) => {
   return (
     <View style={customTabStyles.wrapper}>
-      <View style={customTabStyles.container}>
+      {/* View 대신 LinearGradient로 탭바 전체를 감싸서 뽀얀 유리 질감 부여! */}
+      <LinearGradient
+        colors={['rgba(255, 255, 255, 0.95)', 'rgba(255, 255, 255, 0.7)', 'rgba(255, 255, 255, 0.9)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={customTabStyles.glassContainer}
+      >
         {state.routes.map((route: any, index: number) => {
           const { options } = descriptors[route.key];
           const label = options.tabBarLabel !== undefined ? options.tabBarLabel : options.title !== undefined ? options.title : route.name;
@@ -89,7 +95,7 @@ const CustomTopTabBar = ({ state, descriptors, navigation }: any) => {
           return (
             <TouchableOpacity
               key={index}
-              activeOpacity={0.9}
+              activeOpacity={0.8}
               onPress={onPress}
               style={customTabStyles.tabButton}
             >
@@ -110,7 +116,7 @@ const CustomTopTabBar = ({ state, descriptors, navigation }: any) => {
             </TouchableOpacity>
           );
         })}
-      </View>
+      </LinearGradient>
     </View>
   );
 };
@@ -137,7 +143,7 @@ const ServiceScreen = () => (
         initialRouteName="마음의 숲"
         tabBar={props => <CustomTopTabBar {...props} />}
         screenOptions={{ sceneStyle: { backgroundColor: 'transparent' } } as any}
-      >     
+      >    
         <Tab.Screen name="감정 일기" component={DiaryScreen} />
         <Tab.Screen name="마음의 숲" component={MainScreen} />
         <Tab.Screen name="채팅" component={ChatScreen} />
@@ -247,18 +253,21 @@ const customTabStyles = StyleSheet.create({
     paddingBottom: 15,
     alignItems: 'center',
   },
-  container: {
+  glassContainer: {
     flexDirection: 'row',
     width: '90%',
     height: 52,
-    backgroundColor: '#ffffff', 
     borderRadius: 26,
     padding: 6, 
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 3,
+    
+    borderWidth: 1, 
+    borderColor: '#FFFFFF', 
+    
+    shadowColor: '#FFFFFF', 
+    shadowOffset: { width: 0, height: 4 }, 
+    shadowOpacity: 0.25, 
+    shadowRadius: 20, 
+    elevation: 5,
   },
   tabButton: {
     flex: 1, 
@@ -268,6 +277,10 @@ const customTabStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 20, 
+    shadowColor: '#9ee779',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   inactiveTab: {
     flex: 1,
@@ -278,12 +291,12 @@ const customTabStyles = StyleSheet.create({
   activeTabText: {
     fontFamily: 'NanumSquareRoundB', 
     fontSize: 15,
-    color: '#2a3a21', 
+    color: '#15210f', 
   },
   inactiveTabText: {
-    fontFamily: 'NanumSquareRoundR',
+    fontFamily: 'NanumSquareRoundB', 
     fontSize: 15,
-    color: '#9e9e9e', 
+    color: '#b4b4b4',
   }
 });
 
