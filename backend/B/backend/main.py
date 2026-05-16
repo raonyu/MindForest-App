@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from database import engine, get_db
-import models
+import models, uvicorn
 # [수정] 우리가 업데이트한 라우터들을 임포트합니다.
 from routers import user, diary, analysis, survey, chatbot 
 
@@ -60,3 +60,6 @@ def check_schema(db: Session = Depends(get_db)):
         "score_diff": sample.score_diff,
         "created_at": sample.created_at
     }
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
