@@ -6,6 +6,7 @@ import models
 from pydantic import BaseModel
 from services.ai_logic import analyze_diary_emotion, check_anomaly_level
 from datetime import datetime
+import routine_manager
 
 # --- [1. 요청 데이터 모델] ---
 class DiaryRequest(BaseModel):
@@ -18,9 +19,53 @@ class DiaryRequest(BaseModel):
     score_diff: float = 0.0      
     is_done: bool = False        
 
+class RoutineRequest(BaseModel):
+    user_id: str
+    routine_name: str
+    is_done: bool
+
 router = APIRouter()
 
-# --- [2. 일기 저장 및 수정 (POST)] ---
+# --- [2. 루틴 상태 업데이트 (POST)] ---
+@router.post("/routine")
+def update_routine_status(data: RoutineRequest, db: Session = Depends(get_db)):
+    try:
+        target_date = datetime.now().date()
+        
+        routine_category = "활동형"
+        for cat, levels in routine_manager.ROUTINE_MASTER.items():
+            for level, routines in levels.items():
+                if data.routine_name in routines:
+                    routine_category = cat
+                    break
+
+        existing_diary = db.query(models.Diary).filter(
+            models.Diary.user_id == data.user_id,
+            func.date(models.Diary.created_at) == target_date
+        ).first()
+
+        if existing_diary:
+            existing_diary.routine_name = data.routine_name
+            existing_diary.routine_category = routine_category
+            existing_diary.is_done = data.is_done
+        else:
+            new_diary = models.Diary(
+                user_id=data.user_id,
+                content="",
+                routine_name=data.routine_name,
+                routine_category=routine_category,
+                is_done=data.is_done,
+                created_at=datetime.combine(target_date, datetime.now().time())
+            )
+            db.add(new_diary)
+
+        db.commit()
+        return {"status": "success"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- [3. 일기 저장 및 수정 (POST)] ---
 @router.post("")
 def create_or_update_diary(data: DiaryRequest, db: Session = Depends(get_db)):
     try:

@@ -14,7 +14,9 @@ import MainContext from './MainContext';
 
 import { COLORS } from './assets/Maincolors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import LinearGradient from 'react-native-linear-gradient';
+//import LinearGradient from 'react-native-linear-gradient';
+import {LinearGradient} from 'expo-linear-gradient';
+
 
 import Svg, { Defs, Pattern, Rect, Path as SvgPath } from 'react-native-svg';
 
@@ -201,6 +203,8 @@ function App(){
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    height: Platform.OS === 'web' ? '100vh' : '100%', // 웹 환경에서 화면 전체 높이 고정
+    overflow: 'hidden', // 삐져나가는 내용 숨김 (내부 스크롤 유도)
     backgroundColor: 'transparent', 
   },
   bigfont: {
@@ -214,7 +218,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E4E4E4',
   },
   bottomBar:{
-    position: 'absolute',
+    position: Platform.OS === 'web' ? 'fixed' : 'absolute', // 웹에서는 viewport 하단에 고정
     left: 0,
     right: 0,
     bottom: 0,

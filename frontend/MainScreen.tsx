@@ -6,6 +6,7 @@ import Checkbox from './Checkbox';
 import ReportModal, { ReportResult } from './ReportModal';
 import { COLORS } from './assets/Maincolors';
 import {useBottomBar} from './BottomBarContext';
+import { API_BASE_URL } from './config';
 
 
 //임시 리포트 데이터
@@ -22,7 +23,7 @@ interface currentData{
 //백엔드에서 데이터 불러오기
 const fetchCurrentData = async (userID: string): Promise<currentData | null> => {
     try{
-        const responce = await fetch(`http://localhost:8000/api/analysis/api/report/${userID}`, {
+        const responce = await fetch(`${API_BASE_URL}/api/analysis/api/report/${userID}`, {
                 method: 'GET',
                 headers: {'Content-Type': 'application/json'},
         });
@@ -46,7 +47,7 @@ interface emotionData{
 }
 const fetchEmotionData = async (userID: string): Promise<emotionData | null> => {
     try{
-        const responce = await fetch(`http://localhost:8000/api/analysis/api/emotion-alert/${userID}`, {
+        const responce = await fetch(`${API_BASE_URL}/api/analysis/api/emotion-alert/${userID}`, {
                 method: 'GET',
                 headers: {'Content-Type': 'application/json'},
         });
@@ -69,17 +70,42 @@ const normalizeWeeklyAnalysis = (weeklyAnalysis: currentData['weekly_analysis'])
   if ((weeklyAnalysis as { status?: string }).status === 'no_data') return null;
   return weeklyAnalysis as ReportResult;
 };
-const Routines = ({routines}: {routines: string[]|undefined})=>{
+const Routines = ({routines, userID}: {routines: string[]|undefined, userID: string})=>{
+    const toggleRoutine = async (routine: string, isDone: boolean) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/diary/routine`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    user_id: userID,
+                    routine_name: routine,
+                    is_done: isDone
+                })
+            });
+            if (!response.ok) {
+                console.error("루틴 상태 업데이트 실패");
+            }
+        } catch (error) {
+            console.error("네트워크 오류:", error);
+        }
+    };
+
     return(
         <View style={{alignItems: 'center', margin: 40}}>
             <Text style={{fontSize: 20, fontWeight:'semibold'}}>오늘의 루틴</Text>
             <View style={styles.routineContainer}>
                 {routines?.map((routine, index) => (
-                    <Checkbox key={index}><Text style={{color: 'black', fontSize: 16}}>{routine}</Text></Checkbox>
+                    <Checkbox 
+                        key={index}
+                        onCheck={() => toggleRoutine(routine, true)}
+                        onUncheck={() => toggleRoutine(routine, false)}
+                    >
+                        <Text style={{color: 'black', fontSize: 16}}>{routine}</Text>
+                    </Checkbox>
                   ))}
             </View>
         </View>)
-}; 
+};
 
 const MainScreen = () => {
   const isFocused = useIsFocused();//현재 화면이 포커스 되어있는지 확인
@@ -94,7 +120,7 @@ const MainScreen = () => {
   const requestSurvey = async () => {
     try {
       const surveyType = 'DEPRESSION';
-      const response = await fetch(`http://localhost:8000/api/survey/api/survey/${surveyType}`, {
+      const response = await fetch(`${API_BASE_URL}/api/survey/api/survey/${surveyType}`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -160,7 +186,7 @@ const MainScreen = () => {
     <TouchableOpacity onPress={handleLogOut} style={styles.baseButton}>
       <Text style={styles.baseButtonText}>로그아웃</Text>
     </TouchableOpacity>
-    <Routines routines={currentUserData?.recommendations}></Routines>
+    <Routines routines={currentUserData?.recommendations} userID={user.user_id}></Routines>
   </View>
   )
 };

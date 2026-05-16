@@ -20,9 +20,7 @@ const EMOTIONS = [
   { id: 'anger', color: '#FFD25E', icon: AngryEmoji },
   { id: 'anxiety', color: '#FF6187', icon: AnxiousEmoji },
   { id: 'crying', color: '#E961FF', icon: CryingEmoji },
-];
-
-const API_BASE_URL = Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://127.0.0.1:8000';
+];import { API_BASE_URL } from './config';
 
 const DiaryScreen = () => {
   const { user, handleLogOut } = useMainContext();

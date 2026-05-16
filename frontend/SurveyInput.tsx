@@ -1,66 +1,80 @@
 import React from 'react';
-import { View , Text, TouchableOpacity, StyleSheet} from 'react-native';
-import { COLORS } from './assets/Maincolors';
+import { View , Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 
 const SurveyInput = ({title, options, onSelect}: {title: string, options: string[], onSelect: (val: string) => void}) =>{
     return(
         <View style={styles.surveyContainer}>
-            <View style={styles.bottomTitleContainer}>
-                <Text style={styles.bottomBarText}>{title}</Text>
+            <View style={styles.titleContainer}>
+                <Text style={styles.titleText}>{title}</Text>
             </View>
-            <View style={styles.itemsContainer}>
+            <ScrollView style={styles.itemsContainer} contentContainerStyle={styles.itemsContent}>
                 {options.map((option, index) => (
-                    <TouchableOpacity key={index} onPress={() => onSelect(option)}
-                        style={styles.optionItems}>
-                        <Text style = {styles.itemText} minimumFontScale={0.1}>{option}</Text>
+                    <TouchableOpacity 
+                        key={index} 
+                        onPress={() => onSelect(option)}
+                        style={styles.optionButton}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.itemText}>{option}</Text>
                     </TouchableOpacity>
                 ))}
-            </View>
+            </ScrollView>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     surveyContainer: {
-        backgroundColor: COLORS.bar,
-        borderRadius: 8,
+        backgroundColor: '#ffffff',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingHorizontal: 20,
+        paddingTop: 24,
+        paddingBottom: 40,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 10,
+        maxHeight: 400,
     },
-
-    bottomTitleContainer: {
-        backgroundColor: '#00000030',
-        height: 50,
-        marginVertical: 16,
-        borderRadius: 25,
-        justifyContent: 'center',
-        paddingLeft: 20
+    titleContainer: {
+        marginBottom: 16,
+        paddingHorizontal: 8,
     },
-    bottomBarText: {
-        color: 'white',
-        fontSize: 20,
-        fontWeight: 'bold'
+    titleText: {
+        color: '#2a3a21',
+        fontSize: 18,
+        fontFamily: 'NanumSquareRoundB',
+        lineHeight: 26,
     },
-    itemsContainer:{
-        backgroundColor: '#00000030',
-        height: 256,
+    itemsContainer: {
+        maxHeight: 280,
+    },
+    itemsContent: {
+        gap: 12,
+        paddingBottom: 20,
+        paddingHorizontal: 4,
+    },
+    optionButton: {
+        backgroundColor: '#f9fbf7',
+        borderWidth: 1,
+        borderColor: '#e2ebd9',
         borderRadius: 16,
-        display: 'flex',
-        flexDirection: 'column',
+        paddingVertical: 16,
+        paddingHorizontal: 20,
         justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 28,
+        shadowColor: '#9ee779',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
     },
-    optionItems: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    itemText:{
-        color: 'white',
-        fontSize: 24,
-        fontWeight: 300,
-        justifyContent: 'center',
-        alignItems: 'center',
-        textAlign: 'center',
+    itemText: {
+        color: '#597d48',
+        fontSize: 16,
+        fontFamily: 'NanumSquareRoundR',
+        lineHeight: 22,
     }
 });
 

@@ -1,8 +1,8 @@
 import React, { useEffect, useReducer, useRef } from 'react';
-import {useState} from 'react';
+import { useState } from 'react';
 import { useRoute } from '@react-navigation/native';
-import {StyleSheet,View, Text, Button, TextInput ,FlatList, ListRenderItem, Image, Keyboard, Platform} from 'react-native';
-import {BottomBarProvider, useBottomBar} from './BottomBarContext';
+import { StyleSheet, View, Text, Button, TextInput, FlatList, ListRenderItem, Image, Keyboard, Platform } from 'react-native';
+import { BottomBarProvider, useBottomBar } from './BottomBarContext';
 import ChatInput from './ChatInput';
 import SurveyInput from './SurveyInput';
 import { useIsFocused } from '@react-navigation/native';
@@ -10,6 +10,7 @@ import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import { COLORS } from './assets/Maincolors';
 import ResultModal, { SurveyResult } from './ResultModal';
 import { useMainContext } from './MainContext';
+import { API_BASE_URL } from './config';
 
 
 //메세지 구조 잡기
@@ -51,7 +52,7 @@ const ChatScreen = () => {
   const [surveyResult, setSurveyResult] = useState<SurveyResult | null>(null);
   const [inputText, setInputText] = useState<string>('');
   const [modalVisible, setModalVisible] = useState(false);
-  const {user} = useMainContext();
+  const { user } = useMainContext();
 
 
 
@@ -62,28 +63,28 @@ const ChatScreen = () => {
       id: (MOCK_MESSAGES.length + 1).toString(),
       text: inputText,
       sender: 'user',
-      time: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}),
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     }
     setMessages(prev => [...prev, userMsg]);
     //백앤드로 메세지 보내고 응답 받기
-    try{
-      const response = await fetch('http://localhost:8000/api/chatbot/api/chat', {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chatbot/api/chat`, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({user_id: user.user_id, message: inputText}),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.user_id, message: inputText }),
       });
-       console.log('보냈음', response);
+      console.log('보냈음', response);
       //ai 응답 후 메세지 보내는 함수
       const aiResponse = await response.json();
       const aimag: Message = {
         id: (MOCK_MESSAGES.length + 1).toString(),
         text: aiResponse.reply_message,
         sender: 'ai',
-        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}),
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages(prev => [...prev, aimag]);
-    }catch (error){console.error('응답 실패', error);}
-  } 
+    } catch (error) { console.error('응답 실패', error); }
+  }
 
 
   //메세지 보내는 함수(메세지 데이터들에서 추가하는거)
@@ -92,7 +93,7 @@ const ChatScreen = () => {
       id: (messages.length + 1).toString(),
       text: inputText,
       sender: 'user',
-      time: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}),
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
     setMessages(prevMessages => [...prevMessages, newMessage]);
 
@@ -101,47 +102,48 @@ const ChatScreen = () => {
 
   //설문데이터인지 판별하는 함수
   const getsurveyData = () => {
-    if (lastMessage.sender !==`ai`) return null;
-    try{
-      if(lastMessage.text.includes(`{"type": "select"`)) {
+    if (lastMessage.sender !== `ai`) return null;
+    try {
+      if (lastMessage.text.includes(`{"type": "select"`)) {
         const aiJsonData = JSON.parse(lastMessage.text);
-        return {title: aiJsonData.title, detail: aiJsonData.detail};
+        return { title: aiJsonData.title, detail: aiJsonData.detail };
       }
-    }catch (error){
+    } catch (error) {
       console.error('json 파싱 실패', error);
       return null;
     }
-      return null;
+    return null;
   };
 
-  
+
   //설문조사 데이터, 결과 등의 데이터 여부에 따라 이벤트 처리
   const { setBottomBarContent } = useBottomBar();
   useEffect(() => {
-    if(isFocused){
+    if (isFocused) {
       const surveyData = getsurveyData();
-      if (surveyData){//설문데이터일 시 -> 하단바를 설문 입력창으로 변경
+      if (surveyData) {//설문데이터일 시 -> 하단바를 설문 입력창으로 변경
         setBottomBarContent(
           <SurveyInput
-          title={surveyData.title}
-          options={surveyData.detail}
-          onSelect={(value) => {sendMessages(value);}}/>
+            title={surveyData.title}
+            options={surveyData.detail}
+            onSelect={(value) => { sendMessages(value); }} />
         )
-      }else if(lastMessage.sender === 'ai' && lastMessage.text.includes(`"is_finished": true`)){//결과 데이터일 시 -> 하단바를 결과 모달로 변경
-        try{
+      } else if (lastMessage.sender === 'ai' && lastMessage.text.includes(`"is_finished": true`)) {//결과 데이터일 시 -> 하단바를 결과 모달로 변경
+        try {
           const parsedData = JSON.parse(lastMessage.text);
           setSurveyResult(parsedData);
           setModalVisible(true);
           console.log('결과 데이터 파싱 성공', parsedData);
-        }catch (error){
+        } catch (error) {
           console.error('json 파싱 실패', error);
         }
-        setBottomBarContent(<ChatInput onSend={(inputText) => {sendMessages(inputText);}}/>);
-      }else{//그 이외에는 일반 채팅을 보여줌
+        setBottomBarContent(<ChatInput onSend={(inputText) => { sendMessages(inputText); }} />);
+      } else {//그 이외에는 일반 채팅을 보여줌
         setBottomBarContent(
           <ChatInput
-          onSend={(inputText) => {handleSendMessage(inputText);
-          }}
+            onSend={(inputText) => {
+              handleSendMessage(inputText);
+            }}
           />
         );
       }
@@ -167,16 +169,16 @@ const ChatScreen = () => {
   // 새 메시지 추가 시 자동 스크롤
   useEffect(() => {
     if (flatListRef.current) {
-      try{
+      try {
         // @ts-ignore
         flatListRef.current.scrollToEnd({ animated: true });
-      }catch(e){/* ignore */}
+      } catch (e) {/* ignore */ }
     }
   }, [messages, keyboardHeight]);
 
-  
+
   //메세지 렌더링 컴포넌트
-  const renderMessages: ListRenderItem<Message> = ({item}: {item: Message}) => {
+  const renderMessages: ListRenderItem<Message> = ({ item }: { item: Message }) => {
     //json 데이터 판별
     let surveyData = null;
     if (item.sender === 'ai' && item.text.includes(`{"type": "select"`)) {//설문데이터일경우
@@ -185,51 +187,55 @@ const ChatScreen = () => {
       } catch (error) {
         console.error('json 파싱 실패', error);
       }
-    }else if (item.sender === 'ai' && item.text.includes(`"is_finished": true`)) {//결과데이터일경우
-        try {
-          surveyData = JSON.parse(item.text);
-          console.log('결과 데이터 파싱 성공', surveyData);
-        } catch (error) {
-          console.error('json 파싱 실패', error);
-        }
+    } else if (item.sender === 'ai' && item.text.includes(`"is_finished": true`)) {//결과데이터일경우
+      try {
+        surveyData = JSON.parse(item.text);
+        console.log('결과 데이터 파싱 성공', surveyData);
+      } catch (error) {
+        console.error('json 파싱 실패', error);
+      }
     }
 
-    return(
-    <View style={[styles.messageContainer, item.sender === 'user'? {flexDirection: 'row'} : {flexDirection: 'row-reverse'}]}>
-      {/** 프로필 이미지 영역*/}
-      <View style={[item.sender === 'user' ? styles.userChatting : styles.otherChatting]}>
-        {item.sender === 'ai' && <Image source={require('./assets/profile_icon.png')} style = {[styles.profileImage,styles.otherProfileImage]}/>}
-        {item.sender === 'user' && <Image source={require('./assets/profile_icon.png')} style = {[styles.profileImage,styles.userProfileImage]}/>}
+    const isUser = item.sender === 'user';
+    return (
+      <View style={[styles.messageContainer, isUser ? styles.userRow : styles.aiRow]}>
+        {/** 프로필 이미지 영역 (AI만 표시)*/}
+        {!isUser && (
+          <View style={styles.profileWrapper}>
+            <Image source={require('./assets/profile_icon.png')} style={styles.profileImage} />
+          </View>
+        )}
+
+        <View style={styles.bubbleAndTime}>
+          {/*메세지 말풍선 영역*/}
+          <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.aiBubble]}>
+            <Text style={[styles.messageText, isUser ? styles.userText : styles.aiText]}>
+              {surveyData ? surveyData.title : item.text}
+            </Text>
+          </View>
+          {/*시간*/}
+          <Text style={[styles.timeText, isUser ? styles.timeTextUser : styles.timeTextAi]}>{item.time}</Text>
+        </View>
       </View>
-      {/*메세지 말풍선 영역*/}
-      <View style={[styles.messageBubble, item.sender === 'user' ? styles.userBubble : styles.otherBubble]}>
-        <Text style={[item.sender === 'user' ? styles.userText : styles.otherText]}>
-          {surveyData ? surveyData.title : item.text}{/* 설문조사 JSON 데이터일 경우 title부분을 표시함*/}
-        </Text>
-        <Text style={{fontSize: 12, color: 'gray'}}>{item.time}</Text>
-        {item.sender === 'user' && <View style={styles.userArrow}/>}
-        {item.sender === 'ai' && <View style={styles.otherArrow}/>}
-      </View>
-    </View>
     );
   };
 
   //최종 스크린 보여주기
   return (
-  <View style={styles.container}>
-    <Text style={styles.screenTitle}>채팅 화면</Text>
-    <FlatList<Message>
-      data={messages}
-      renderItem= {renderMessages}
-      keyExtractor={item => item.id}
-      style={styles.list}
-      contentContainerStyle={[styles.listContent, {paddingBottom: 24 + keyboardHeight}]}
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="interactive"
-      ref={(ref) => { /* @ts-ignore */ flatListRef.current = ref }}
-    />
-    <ResultModal isVisible={modalVisible} data={surveyResult} onClose={() => setModalVisible(false)}/>
-  </View>
+    <View style={styles.container}>
+      <Text style={styles.screenTitle}>채팅 화면</Text>
+      <FlatList<Message>
+        data={messages}
+        renderItem={renderMessages}
+        keyExtractor={item => item.id}
+        style={styles.list}
+        contentContainerStyle={[styles.listContent, { paddingBottom: 24 + keyboardHeight }]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        ref={(ref) => { /* @ts-ignore */ flatListRef.current = ref }}
+      />
+      <ResultModal isVisible={modalVisible} data={surveyResult} onClose={() => setModalVisible(false)} />
+    </View>
   );
 };
 
@@ -237,112 +243,96 @@ const ChatScreen = () => {
 
 //스타일 시트
 const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      paddingBottom: 100, // 하단바가 고정일 때 내용이 가려지지 않도록 여유를 둠
-    },
-    screenTitle: {
-      fontSize: 14,
-      color: '#333',
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-    },
-    list: {
-      flex: 1,
-    },
-    listContent: {
-      paddingHorizontal: 8,
-      paddingTop: 8,
-      paddingBottom: 24,
-    },
-    messageContainer: {//프로필 + 말풍선 컨테이너
-        marginVertical: 8,
-        marginHorizontal: 16,
-        display: 'flex',
-        alignItems: 'flex-end',
-        gap: 20,
-    },
-    messageBubble: {//공통 말풍선 스타일
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        shadowOffset: {width: 0, height: 2},
-        marginVertical: 4,
-        maxWidth: '75%',
-        flexShrink: 1,
-    },
-    profileImage:{
-      width: 64,
-      height: 64,
-      borderRadius: 32,
-    },
-    userText: {
-      fontSize: 16,
-      color: 'white',
-      flexWrap: 'wrap',
-      flexShrink: 1,
-    },
-    userChatting: {
-        flexDirection: 'row',
-    },
-    userProfileImage: {
-    },
-    userBubble: {
-        alignSelf: 'flex-start',
-        backgroundColor: COLORS.user
-    },
-    userArrow: {//화살표 만들기
-        position: 'absolute',
-        bottom: 0,
-        left: -10,
-        width: 0,
-        height: 0,
-        backgroundColor: 'transparent',
-        borderStyle: 'solid',
-        borderTopWidth: 10,
-        borderLeftWidth : 10,
-        borderRightWidth: 10,
-        borderBottomWidth: 10,
-        
-        borderTopColor: 'transparent',
-        borderLeftColor: 'transparent',
-        borderRightColor: 'transparent',
-        borderBottomColor: COLORS.user,
-    },
-
-    otherText: {
-      fontSize: 16,
-      color: 'black',
-      flexWrap: 'wrap',
-      flexShrink: 1,
-    },
-    otherChatting: {
-        flexDirection: 'row-reverse',
-    },
-    otherProfileImage: {
-    },
-    otherBubble: {
-        alignSelf: 'flex-end',
-        backgroundColor: COLORS.other
-    },
-    otherArrow: {
-        position: 'absolute',
-        bottom: 0,
-        right: -10,
-        width: 0,
-        height: 0,
-        backgroundColor: 'transparent',
-        borderStyle: 'solid',
-        borderTopWidth: 10,
-        borderLeftWidth : 10,
-        borderRightWidth: 10,
-        borderBottomWidth: 10,
-        
-        borderTopColor: 'transparent',
-        borderLeftColor: 'transparent',
-        borderRightColor: 'transparent',
-        borderBottomColor: COLORS.other,
-    }
+  container: {
+    flex: 1,
+    paddingBottom: 100, // 하단바가 고정일 때 내용이 가려지지 않도록 여유를 둠
+  },
+  screenTitle: {
+    fontSize: 14,
+    color: '#333',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  list: {
+    flex: 1,
+  },
+  listContent: {
+    paddingHorizontal: 8,
+    paddingTop: 8,
+    paddingBottom: 24,
+  },
+  messageContainer: {
+    marginVertical: 6,
+    marginHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  userRow: {
+    justifyContent: 'flex-end',
+  },
+  aiRow: {
+    justifyContent: 'flex-start',
+  },
+  profileWrapper: {
+    marginRight: 10,
+  },
+  profileImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#eaffdf',
+  },
+  bubbleAndTime: {
+    flexDirection: 'column',
+    maxWidth: '75%',
+  },
+  messageBubble: {
+    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  userBubble: {
+    backgroundColor: '#9ee779',
+    borderTopRightRadius: 4,
+    alignSelf: 'flex-end',
+  },
+  aiBubble: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 4,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#e2ebd9',
+  },
+  messageText: {
+    fontSize: 15,
+    fontFamily: 'NanumSquareRoundR',
+    lineHeight: 22,
+  },
+  userText: {
+    color: '#15210f',
+  },
+  aiText: {
+    color: '#2a3a21',
+  },
+  timeText: {
+    fontSize: 11,
+    color: '#a0a88f',
+    fontFamily: 'NanumSquareRoundR',
+    marginTop: 4,
+  },
+  timeTextUser: {
+    alignSelf: 'flex-end',
+    marginRight: 4,
+  },
+  timeTextAi: {
+    alignSelf: 'flex-start',
+    marginLeft: 4,
+  }
 });
 
 export default ChatScreen;
