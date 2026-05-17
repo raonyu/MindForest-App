@@ -154,7 +154,9 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
   const FormView = () => (
     <View style={styles.formViewContainer}>
       <TouchableOpacity style={styles.backButton} onPress={() => setScreenStep(0)}>
-        <Text style={styles.backButtonText}>◀ 밖으로 나가기</Text>
+      <Text style={styles.backButtonText}>
+          <Text style={styles.arrowIcon}>◀</Text> 밖으로 나가기
+        </Text>
       </TouchableOpacity>
 
       <View style={styles.formCard}>
@@ -296,6 +298,10 @@ const styles = StyleSheet.create({
     fontFamily: 'NanumSquareRoundB',
     fontSize: 15,
     color: '#597d48', 
+  },
+  arrowIcon: {
+    fontFamily: 'MemomentKkukkukk',
+    fontSize: 15, // 기호가 너무 작아 보이면 이 숫자를 조절하세요!
   },
   formTitleContainer: {
     alignItems: 'center',
