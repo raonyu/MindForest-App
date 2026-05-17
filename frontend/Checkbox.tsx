@@ -1,6 +1,6 @@
 import React, { useState, ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import { COLORS } from './assets/Maincolors';
 
 interface CheckboxProps {

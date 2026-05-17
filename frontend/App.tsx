@@ -4,18 +4,18 @@
  *
  * @format
  */
-import React, { useEffect, useRef , createContext, useContext, useState} from 'react';
+import React, { useEffect, useRef, createContext, useContext, useState } from 'react';
 import { Animated, StatusBar, StyleSheet, useColorScheme, View, Text, Pressable, TouchableOpacity, FlatList, ListRenderItem, Platform, Keyboard } from 'react-native';
-import {NavigationContainer} from '@react-navigation/native';
-import {createMaterialTopTabNavigator} from '@react-navigation/material-top-tabs';
+import { NavigationContainer } from '@react-navigation/native';
+import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import {BottomBarProvider, useBottomBar} from './BottomBarContext';
+import { BottomBarProvider, useBottomBar } from './BottomBarContext';
 import MainContext from './MainContext';
 
 import { COLORS } from './assets/Maincolors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-//import LinearGradient from 'react-native-linear-gradient';
-import {LinearGradient} from 'expo-linear-gradient';
+import LinearGradient from 'react-native-linear-gradient';
+//import {LinearGradient} from 'expo-linear-gradient';
 
 
 import Svg, { Defs, Pattern, Rect, Path as SvgPath } from 'react-native-svg';
@@ -31,14 +31,14 @@ const Stack = createStackNavigator();
 
 //하단바 컨텍스트 생성 및 애니메이션
 const BottomBar = () => {
-  const { BottomBar:content } = useBottomBar();
+  const { BottomBar: content } = useBottomBar();
   const yPosAnim = useRef(new Animated.Value(100)).current;
   const keyboardAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (content){
-      Animated.spring(yPosAnim, {toValue: 0, useNativeDriver: true}).start();
-    }else{
+    if (content) {
+      Animated.spring(yPosAnim, { toValue: 0, useNativeDriver: true }).start();
+    } else {
       yPosAnim.setValue(100);
     }
   }, [content]);
@@ -49,10 +49,10 @@ const BottomBar = () => {
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSub = Keyboard.addListener(showEvent, (e: any) => {
       const h = e.endCoordinates ? e.endCoordinates.height : 300;
-      Animated.timing(keyboardAnim, {toValue: -h, duration: 200, useNativeDriver: true}).start();
+      Animated.timing(keyboardAnim, { toValue: -h, duration: 200, useNativeDriver: true }).start();
     });
     const hideSub = Keyboard.addListener(hideEvent, () => {
-      Animated.timing(keyboardAnim, {toValue: 0, duration: 200, useNativeDriver: true}).start();
+      Animated.timing(keyboardAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
     });
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
@@ -60,9 +60,9 @@ const BottomBar = () => {
   if (!content) return null;
 
   return (
-  <Animated.View style={[styles.bottomBar, {transform: [{translateY: Animated.add(yPosAnim, keyboardAnim)}]}]}>
-    {content}
-  </Animated.View>
+    <Animated.View style={[styles.bottomBar, { transform: [{ translateY: Animated.add(yPosAnim, keyboardAnim) }] }]}>
+      {content}
+    </Animated.View>
   );
 };
 
@@ -103,7 +103,7 @@ const CustomTopTabBar = ({ state, descriptors, navigation }: any) => {
             >
               {isFocused ? (
                 <LinearGradient
-                  colors={['#cffff1', '#9ee779']} 
+                  colors={['#cffff1', '#9ee779']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={customTabStyles.activeTab}
@@ -127,7 +127,7 @@ const CustomTopTabBar = ({ state, descriptors, navigation }: any) => {
 const ServiceScreen = () => (
   <BottomBarProvider>
     <View style={styles.container}>
-      
+
       {/* App 최상단에 모눈종이를 깔기 */}
       <View style={StyleSheet.absoluteFill}>
         <Svg width="100%" height="100%">
@@ -141,62 +141,62 @@ const ServiceScreen = () => (
         </Svg>
       </View>
 
-      <Tab.Navigator 
+      <Tab.Navigator
         initialRouteName="마음의 숲"
         tabBar={props => <CustomTopTabBar {...props} />}
         screenOptions={{ sceneStyle: { backgroundColor: 'transparent' } } as any}
-      >    
+      >
         <Tab.Screen name="감정 일기" component={DiaryScreen} />
         <Tab.Screen name="마음의 숲" component={MainScreen} />
         <Tab.Screen name="채팅" component={ChatScreen} />
       </Tab.Navigator>
-      <BottomBar/>
+      <BottomBar />
     </View>
   </BottomBarProvider>
 );
 
-function App(){
+function App() {
   const isDarkMode = useColorScheme() === 'dark';
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() =>{
-    const checkLoginStatus = async() =>{
-      try{
+  useEffect(() => {
+    const checkLoginStatus = async () => {
+      try {
         const savedUser = await AsyncStorage.getItem('user_data');
-        if(savedUser) setUser(JSON.parse(savedUser));
-      }catch(e){
+        if (savedUser) setUser(JSON.parse(savedUser));
+      } catch (e) {
         console.error("데이터 불러오기 실패", e)
-      }finally{
+      } finally {
         setIsLoading(false);
       }
     }
     checkLoginStatus();
   }, [])
-  
-  const handleLogin = async (userData:any)=>{
-    try{
+
+  const handleLogin = async (userData: any) => {
+    try {
       await AsyncStorage.setItem('user_data', JSON.stringify(userData));
       setUser(userData);
-    }catch(e){console.error("데이터 저장 실패", e)}
+    } catch (e) { console.error("데이터 저장 실패", e) }
   }
-  
-  const handleLogOut = async () =>{
+
+  const handleLogOut = async () => {
     await AsyncStorage.removeItem('user_data');
     setUser(null);
     console.log("로그아웃 되었습니다");
   }
 
   return (
-    <MainContext.Provider value={{user, setUser, handleLogOut}}>
+    <MainContext.Provider value={{ user, setUser, handleLogOut }}>
       <NavigationContainer>
         <Stack.Navigator>
           {user ? (
             <>
-              <Stack.Screen name="메인서비스" component = {ServiceScreen} options={{headerShown: false}}/>
+              <Stack.Screen name="메인서비스" component={ServiceScreen} options={{ headerShown: false }} />
             </>
           ) : (
-            <Stack.Screen name="로그인" options={{headerShown: false}}>{(props: any) => <LoginScreen {...props} onLoginSuccess={handleLogin} />}</Stack.Screen>
+            <Stack.Screen name="로그인" options={{ headerShown: false }}>{(props: any) => <LoginScreen {...props} onLoginSuccess={handleLogin} />}</Stack.Screen>
           )}
         </Stack.Navigator>
       </NavigationContainer>
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: Platform.OS === 'web' ? '100vh' : '100%', // 웹 환경에서 화면 전체 높이 고정
     overflow: 'hidden', // 삐져나가는 내용 숨김 (내부 스크롤 유도)
-    backgroundColor: 'transparent', 
+    backgroundColor: 'transparent',
   },
   bigfont: {
     fontSize: 32,
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: '#E4E4E4',
   },
-  bottomBar:{
+  bottomBar: {
     position: Platform.OS === 'web' ? 'fixed' : 'absolute', // 웹에서는 viewport 하단에 고정
     left: 0,
     right: 0,
@@ -252,8 +252,8 @@ const styles = StyleSheet.create({
 
 const customTabStyles = StyleSheet.create({
   wrapper: {
-    backgroundColor: 'transparent', 
-    paddingTop: Platform.OS === 'ios' ? 60 : 30, 
+    backgroundColor: 'transparent',
+    paddingTop: Platform.OS === 'ios' ? 60 : 30,
     paddingBottom: 15,
     alignItems: 'center',
   },
@@ -262,25 +262,25 @@ const customTabStyles = StyleSheet.create({
     width: '90%',
     height: 52,
     borderRadius: 26,
-    padding: 6, 
-    
-    borderWidth: 1, 
-    borderColor: '#FFFFFF', 
-    
-    shadowColor: '#FFFFFF', 
-    shadowOffset: { width: 0, height: 4 }, 
-    shadowOpacity: 0.25, 
-    shadowRadius: 20, 
+    padding: 6,
+
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
     elevation: 5,
   },
   tabButton: {
-    flex: 1, 
+    flex: 1,
   },
   activeTab: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20, 
+    borderRadius: 20,
     shadowColor: '#9ee779',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -293,12 +293,12 @@ const customTabStyles = StyleSheet.create({
     borderRadius: 20,
   },
   activeTabText: {
-    fontFamily: 'NanumSquareRoundB', 
+    fontFamily: 'NanumSquareRoundB',
     fontSize: 15,
-    color: '#15210f', 
+    color: '#15210f',
   },
   inactiveTabText: {
-    fontFamily: 'NanumSquareRoundB', 
+    fontFamily: 'NanumSquareRoundB',
     fontSize: 15,
     color: '#b4b4b4',
   }

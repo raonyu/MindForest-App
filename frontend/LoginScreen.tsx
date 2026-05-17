@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react'; 
-import { 
-  StyleSheet, View, Text, TouchableOpacity, Alert, 
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  StyleSheet, View, Text, TouchableOpacity, Alert,
   TextInput, Platform, KeyboardAvoidingView, ScrollView, ImageBackground,
   Animated,
-  Easing 
+  Easing
 } from 'react-native';
-//import LinearGradient from 'react-native-linear-gradient';
-import{ LinearGradient }from 'expo-linear-gradient';
+import LinearGradient from 'react-native-linear-gradient';
+//import{ LinearGradient }from 'expo-linear-gradient';
 import { API_BASE_URL } from './config';
 
 const LoginScreen = ({ onLoginSuccess }: any) => {
@@ -17,7 +17,7 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
   const [isLoading, setIsLoading] = useState(false);
 
   const titleText = "마음의 숲";
-  const titleArray = titleText.split(''); 
+  const titleArray = titleText.split('');
   //애니메이션 엔진
   const bounceAnims = useRef(titleArray.map(() => new Animated.Value(0))).current;
 
@@ -27,15 +27,15 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
       const animations = bounceAnims.map((anim: Animated.Value) =>
         Animated.sequence([
           Animated.timing(anim, {
-            toValue: -5,       
-            duration: 600,      
-            easing: Easing.inOut(Easing.ease), 
+            toValue: -5,
+            duration: 600,
+            easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
           Animated.timing(anim, {
             toValue: 0,
-            duration: 600,      
-            easing: Easing.inOut(Easing.ease), 
+            duration: 600,
+            easing: Easing.inOut(Easing.ease),
             useNativeDriver: true,
           }),
         ])
@@ -44,7 +44,7 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
       Animated.loop(
         Animated.sequence([
           Animated.stagger(300, animations),
-          Animated.delay(2000) 
+          Animated.delay(2000)
         ])
       ).start();
     };
@@ -81,7 +81,7 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
       if (authAction === 'login') {
         const normalizedUser = {
           ...result,
-          user_id: result.user_id || result.id || inputId 
+          user_id: result.user_id || result.id || inputId
         };
         onLoginSuccess(normalizedUser);
       } else {
@@ -114,7 +114,7 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
               key={index}
               style={[
                 styles.mainTitleLarge,
-                { transform: [{ translateY: bounceAnims[index] }] } 
+                { transform: [{ translateY: bounceAnims[index] }] }
               ]}
             >
               {char}
@@ -125,8 +125,8 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
       </View>
 
       <View style={styles.welcomeButtonContainer}>
-        <TouchableOpacity 
-          activeOpacity={0.8} 
+        <TouchableOpacity
+          activeOpacity={0.8}
           style={styles.actionButtonWrapper}
           onPress={() => {
             setAuthAction('signup');
@@ -138,7 +138,7 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
           </LinearGradient>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.textButtonWrapper}
           onPress={() => {
             setAuthAction('login');
@@ -185,9 +185,9 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
           editable={!isLoading}
         />
 
-        <TouchableOpacity 
-          activeOpacity={0.8} 
-          onPress={startAuth} 
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={startAuth}
           disabled={isLoading}
           style={[styles.actionButtonWrapper, { marginTop: 10 }]}
         >
@@ -202,8 +202,8 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
   );
 
   return (
-    <ImageBackground 
-      source={require('./assets/forest_bg.jpg')} 
+    <ImageBackground
+      source={require('./assets/forest_bg.jpg')}
       style={styles.backgroundImage}
       resizeMode="cover"
     >
@@ -225,22 +225,22 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: 'transparent', 
+    backgroundColor: 'transparent',
   },
   scrollContainer: {
     flexGrow: 1,
     paddingHorizontal: 25,
   },
-  
+
   // 🏠 Step 0 Styles
   welcomeContainer: {
     flex: 1,
     width: '100%',
-    justifyContent: 'flex-end', 
+    justifyContent: 'flex-end',
   },
   welcomeTextContainer: {
-    position: 'absolute', 
-    top: '44%',           
+    position: 'absolute',
+    top: '44%',
     width: '100%',
     alignItems: 'center',
   },
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
     fontFamily: 'ownglyph',
     fontSize: 58,
     color: '#2a3a21',
-    textShadowColor: 'rgba(255, 255, 255, 0.9)', 
+    textShadowColor: 'rgba(255, 255, 255, 0.9)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 8,
   },
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 135, 
+    marginBottom: 135,
   },
   actionButtonTextLarge: {
     fontFamily: 'NanumSquareRoundB',
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
   formViewContainer: {
     flex: 1,
     width: '100%',
-    justifyContent: 'flex-end', 
+    justifyContent: 'flex-end',
     paddingBottom: 40,
   },
   backButton: {
@@ -295,7 +295,7 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontFamily: 'NanumSquareRoundB',
     fontSize: 15,
-    color: '#597d48', 
+    color: '#597d48',
   },
   formTitleContainer: {
     alignItems: 'center',
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
   },
   inputBox: {
     fontFamily: 'NanumSquareRoundR',
-    backgroundColor: '#ffffff', 
+    backgroundColor: '#ffffff',
     height: 52,
     borderRadius: 14,
     paddingHorizontal: 16,
@@ -342,11 +342,11 @@ const styles = StyleSheet.create({
     borderColor: '#eaffdf',
     marginBottom: 20,
   },
-  
+
   actionButtonWrapper: {
     width: '100%',
     borderRadius: 18,
-    shadowColor: '#9ee779', 
+    shadowColor: '#9ee779',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -361,7 +361,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontFamily: 'NanumSquareRoundB',
     fontSize: 16,
-    color: '#15210f', 
+    color: '#15210f',
   }
 });
 
