@@ -1,5 +1,9 @@
 {
   "devDependencies": {
     "baseline-browser-mapping": "^2.10.29"
+  },
+  "dependencies": {
+    "expo": "^55.0.24",
+    "expo-linear-gradient": "~55.0.14"
   }
 }

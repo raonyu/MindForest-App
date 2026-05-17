@@ -15,7 +15,7 @@ import MainContext from './MainContext';
 import { COLORS } from './assets/Maincolors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LinearGradient from 'react-native-linear-gradient';
-//import {LinearGradient} from 'expo-linear-gradient';
+// import {LinearGradient} from 'expo-linear-gradient';
 
 
 import Svg, { Defs, Pattern, Rect, Path as SvgPath } from 'react-native-svg';
@@ -66,11 +66,10 @@ const BottomBar = () => {
   );
 };
 
-// 💡 커스텀 탭바 컴포넌트 (1px 테두리 얇은 리퀴드 글래스 버전 🍎)
+
 const CustomTopTabBar = ({ state, descriptors, navigation }: any) => {
   return (
     <View style={customTabStyles.wrapper}>
-      {/* View 대신 LinearGradient로 탭바 전체를 감싸서 뽀얀 유리 질감 부여! */}
       <LinearGradient
         colors={['rgba(255, 255, 255, 0.95)', 'rgba(255, 255, 255, 0.7)', 'rgba(255, 255, 255, 0.9)']}
         start={{ x: 0, y: 0 }}
@@ -209,7 +208,7 @@ function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    height: Platform.OS === 'web' ? '100vh' : '100%', // 웹 환경에서 화면 전체 높이 고정
+    // height: Platform.OS === 'web' ? '100vh' : '100%', // 웹 환경에서 화면 전체 높이 고정
     overflow: 'hidden', // 삐져나가는 내용 숨김 (내부 스크롤 유도)
     backgroundColor: 'transparent',
   },
@@ -224,8 +223,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E4E4E4',
   },
   bottomBar: {
-    position: Platform.OS === 'web' ? 'fixed' : 'absolute', // 웹에서는 viewport 하단에 고정
-    left: 0,
+    position: 'absolute',
     right: 0,
     bottom: 0,
     backgroundColor: COLORS.bar,
