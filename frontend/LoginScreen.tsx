@@ -5,8 +5,8 @@ import {
   Animated,
   Easing 
 } from 'react-native';
-//import LinearGradient from 'react-native-linear-gradient';
-import{ LinearGradient }from 'expo-linear-gradient';
+import LinearGradient from 'react-native-linear-gradient';
+// import{ LinearGradient }from 'expo-linear-gradient';
 import { API_BASE_URL } from './config';
 
 const LoginScreen = ({ onLoginSuccess }: any) => {

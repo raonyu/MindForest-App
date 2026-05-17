@@ -294,11 +294,6 @@ const DiaryScreen = () => {
                         backgroundColor: emo.color + '1A', 
                         borderColor: emo.color + '66', 
                         borderWidth: 2,
-                        shadowColor: emo.color, 
-                        shadowOffset: { width: 0, height: 4 },
-                        shadowOpacity: 0.2,
-                        shadowRadius: 10,
-                        elevation: 2,
                       } : null
                     ]}
                     onPress={() => handleSelectEmotion(emo.id)}
