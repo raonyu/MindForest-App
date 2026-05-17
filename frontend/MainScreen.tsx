@@ -200,41 +200,7 @@ const MainScreen = () => {
     }
   };
 
-  const startCategorySurvey = async () => {
-    // 동물 유형에 따른 설문 타입 매핑
-    let surveyType = currentUserData?.assigned_category;
-    if (currentUserData?.user_animal === "조용히 움츠린 거북이") {
-      surveyType = "DEPRESSION";
-    }
 
-    if (!surveyType) {
-      Alert.alert("알림", "아직 진행할 수 있는 유형 설문조사가 없습니다.");
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/survey/${surveyType}`);
-      if (!response.ok) {
-        Alert.alert('설문 문항 불러오기 실패', '서버 오류');
-        return;
-      }
-
-      const data = await response.json();
-
-      if (data && data.length > 0) {
-        navigation.navigate("채팅", {
-          surveyMode: true,
-          surveyQuestions: data,
-          surveyType: surveyType
-        });
-      } else {
-        Alert.alert('알림', '가져올 설문 문항이 없습니다.');
-      }
-    } catch (error) {
-      console.error('설문 문항 불러오기 실패:', error);
-      Alert.alert('오류', '네트워크 연결을 확인해주세요.');
-    }
-  };
 
   useEffect(() => {
     const load = async () => {
@@ -292,10 +258,18 @@ const MainScreen = () => {
             <Text style={styles.sectionTitle}>안녕하세요, {user.user_id}님!</Text>
           </View>
 
+          {/* 디버그용 사용자 정보 */}
+          {currentUserData && (
+            <View style={{ backgroundColor: '#f0f0f0', padding: 10, borderRadius: 8, marginVertical: 8, alignItems: 'center' }}>
+              <Text style={{ fontSize: 12, color: '#333', fontWeight: 'bold', marginBottom: 4 }}>[디버그: 사용자 정보]</Text>
+              <Text style={{ fontSize: 12, color: '#555' }}>동물 유형: {user?.user_animal || '없음'}</Text>
+              <Text style={{ fontSize: 12, color: '#555' }}>배정 카테고리: {user?.assigned_category || '없음'}</Text>
+            </View>
+          )}
           {/* 감정 메시지 */}
           {emotionMessage?.message && (
             <View style={styles.messageContainer}>
-              <Text style={styles.messageText}>{emotionMessage.message}</Text>
+              <Text style={styles.messageText}>{user?.diagnosis_result?.result_message || emotionMessage?.message}</Text>
             </View>
           )}
         </View>
@@ -305,6 +279,11 @@ const MainScreen = () => {
           <TouchableOpacity activeOpacity={0.8} style={styles.unifiedBtnWrapper} onPress={() => { navigation.navigate("채팅"); requestSurvey(); }}>
             <View style={styles.unifiedBtnInner}>
               <Text style={styles.unifiedBtnText}>마음의 숲 사전 테스트 🌱</Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.8} style={styles.unifiedBtnWrapper} onPress={() => { navigation.navigate("채팅"); startCategorySurvey(); }}>
+            <View style={styles.unifiedBtnInner}>
+              <Text style={styles.unifiedBtnText}>유형별 테스트 진행하기</Text>
             </View>
           </TouchableOpacity>
 
