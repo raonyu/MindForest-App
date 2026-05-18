@@ -3,115 +3,134 @@ from sqlalchemy.orm import Session
 import bcrypt
 from database import get_db
 import models
-# [추가] 조원 C의 루틴 관리 로직 연동
-import routine_manager
+from typing import List, Optional
 from pydantic import BaseModel
-from services.ai_logic import analyze_onboarding_survey
-from datetime import datetime
+from datetime import date
+import datetime
 
-# --- [1. 요청 데이터 모델] ---
+# 서비스 로직 임포트 (경로를 본인 환경에 맞게 확인하세요)
+import routine_manager
+from services.chatbot_logic import get_chat_response
+
+router = APIRouter()
+
 class UserAuth(BaseModel):
     id: str
     password: str
 
 class OnboardingRequest(BaseModel):
     user_id: str
-    responses: str  # 질문-답변 텍스트 전체
+    responses: List[str]
 
-# --- [2. 라우터 설정] ---
-router = APIRouter()
-
-# --- [3. 보안 로직] ---
+# --- [비밀번호 보안] ---
 def get_password_hash(password: str):
-    pwd_bytes = password.encode('utf-8')
-    salt = bcrypt.gensalt()
-    hashed_password = bcrypt.hashpw(pwd_bytes, salt)
-    return hashed_password.decode('utf-8')
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-def verify_password(plain_password: str, hashed_password: str):
-    password_bytes = plain_password.encode('utf-8')
-    hashed_bytes = hashed_password.encode('utf-8')
-    return bcrypt.checkpw(password_bytes, hashed_bytes)
+def verify_password(plain_password, hashed_password):
+    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
 
-
-# --- [4. 회원가입 엔드포인트] ---
-@router.post("/api/signup")
+# --- [회원가입 / 로그인] ---
+@router.post("/signup")
 def signup(data: UserAuth, db: Session = Depends(get_db)):
-    existing_user = db.query(models.User).filter(models.User.id == data.id).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="이미 존재하는 아이디입니다.")
-
-    hashed_password = get_password_hash(data.password)
-    
-    # [요구사항 2 반영] created_at(가입일)은 models.py에서 DateTime(timezone=True)로 설정됨
-    new_user = models.User(
-        id=data.id,
-        password=hashed_password,
-        is_onboarding_done=False
-    )
-
+    if db.query(models.User).filter(models.User.id == data.id).first():
+        raise HTTPException(status_code=400, detail="중복 아이디")
+    new_user = models.User(id=data.id, password=get_password_hash(data.password))
     db.add(new_user)
     db.commit()
-    return {"message": "signup success", "signup_date": new_user.created_at}
+    return {"message": "signup success"}
 
-
-# --- [5. 로그인 엔드포인트] ---
-@router.post("/api/login")
+@router.post("/login")
 def login(data: UserAuth, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.id == data.id).first()
-    
     if not user or not verify_password(data.password, user.password):
-        raise HTTPException(status_code=401, detail="아이디 또는 비밀번호가 틀렸습니다.")
-    
-    # [요구사항 2 반영] 가입일(signup_date) 정보를 함께 반환하여 프론트/분석에서 활용
-    return {
-        "message": "login success", 
-        "user_id": user.id,
-        "is_onboarding_done": user.is_onboarding_done,
-        "user_animal": user.user_animal,
-        "signup_date": user.created_at  # timezone-aware datetime
-    }
+        raise HTTPException(status_code=401, detail="로그인 실패")
+    return {"message": "login success", "user_id": user.id, "is_onboarding_done": user.is_onboarding_done}
 
-
-# --- [6. 온보딩 분석 및 캐릭터 배정 엔드포인트] ---
-@router.post("/api/user/onboarding")
+# --- [온보딩 완료 및 동물 배정 - 핵심 로직] ---
+@router.post("/onboarding")
 def complete_onboarding(data: OnboardingRequest, db: Session = Depends(get_db)):
-    """
-    GPT 분석 후 질환 카테고리를 배정하고, C의 로직을 통해 첫 루틴을 할당합니다.
-    """
     user = db.query(models.User).filter(models.User.id == data.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
 
-    # 1. GPT를 통한 온보딩 설문 분석
-    analysis_result = analyze_onboarding_survey(data.responses)
+    # 1. AI 분석 (결과 예: DEPRESSION)
+    chat_history = [{"role": "user", "content": res} for res in data.responses]
+    analysis = get_chat_response("분석해줘", chat_history=chat_history, is_onboarding_done=False)
     
-    if not analysis_result:
-        raise HTTPException(status_code=500, detail="온보딩 분석에 실패했습니다.")
+    # 2. 카테고리 코드 세척
+    category_code = str(analysis["category"]).strip().upper()
 
-    # 2. 분석 결과 DB 업데이트
-    user.assigned_category = analysis_result["category"]  # 예: "ADHD"
-    user.user_animal = analysis_result["name"]            # 예: "산만한 다람쥐"
+    # 3. [핵심] DB의 Animal 테이블에서 실제 이름을 가져옴
+    animal_info = db.query(models.Animal).filter(models.Animal.category == category_code).first()
+    
+    # 4. 유저 테이블에 즉시 기록 (이게 되어야 Profile에서 null이 안 나옴)
+    user.assigned_category = category_code
+    if animal_info:
+        user.user_animal = animal_info.name  # 예: "느긋한 거북이"
+    else:
+        user.user_animal = f"신비로운 {category_code}" # DB에 없을 때 방어코드
+
     user.is_onboarding_done = True
     
-    # 3. [C의 협업 포인트] 온보딩 완료 즉시 해당 카테고리에 맞는 초기 루틴 생성
-    # routine_manager.py의 로직을 호출하여 사용자의 첫 루틴 데이터를 세팅합니다.
+    # 5. 루틴 데이터도 이때 생성해버림
     try:
-        routine_manager.initialize_user_routine(
-            user_id=user.id, 
-            category=user.assigned_category
-        )
+        routine_manager.initialize_user_routine(db, user.id, category_code)
     except Exception as e:
-        print(f"루틴 초기화 경고: {e}") # 루틴 초기화 실패가 회원가입 실패로 이어지진 않게 처리
+        print(f"루틴 할당 실패: {e}")
 
+    # 6. DB에 최종 커밋 (확정 저장)
     db.commit()
     db.refresh(user)
 
     return {
-        "message": "onboarding complete",
-        "user_animal": user.user_animal,
+        "status": "success", 
+        "animal_category": user.user_animal, # 요청하신 이름으로 반환
+        "category_code": user.assigned_category
+    }
+
+# --- [프로필 조회: 온보딩에서 저장한 값을 그대로 가져옴] ---
+@router.get("/profile/{user_id}")
+def get_user_profile(user_id: str, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="사용자 없음")
+
+    # 1. 저장된 카테고리를 기반으로 동물 상세 정보 실시간 매핑
+    animal_info = db.query(models.Animal).filter(
+        models.Animal.category == user.assigned_category
+    ).first()
+
+    # 2. 전문 진단 결과 조회
+    latest_survey = db.query(models.SurveyResult).filter(
+        models.SurveyResult.user_id == user_id,
+        models.SurveyResult.survey_type == user.assigned_category
+    ).order_by(models.SurveyResult.created_at.desc()).first()
+
+    # 3. 오늘 할당된 루틴 조회
+    today = datetime.date.today()
+    routines = db.query(models.UserRoutine).filter(
+        models.UserRoutine.user_id == user_id, 
+        models.UserRoutine.date == today
+    ).all()
+
+    routine_list = []
+    for r in routines:
+        routine_list.append({
+            "user_routine_id": r.id,
+            "content": r.routine_detail.content if r.routine_detail else "내용 없음",
+            "is_completed": r.is_completed
+        })
+
+    return {
+        "user_id": user.id,
+        "is_onboarding_done": user.is_onboarding_done,
         "assigned_category": user.assigned_category,
-        "signup_date": user.created_at, # 요구사항 2 반영
-        "next_survey": analysis_result["survey"],
-        "reason": analysis_result["reason"]
+        "animal_category": animal_info.name if animal_info else user.user_animal,
+        "animal_emoji": animal_info.emoji if animal_info else "🐾",
+        "animal_description": animal_info.description if animal_info else "분석 완료",
+        "diagnosis_result": {
+            "total_score": latest_survey.score if latest_survey else 0,
+            "result_message": latest_survey.result_message if latest_survey else "기록 없음"
+        },
+        "today_routines": routine_list  # [수정] 3개가 모두 담겨서 나갑니다.
     }
