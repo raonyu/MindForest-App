@@ -12,21 +12,25 @@ import Svg, { Defs, Pattern, Rect, Path as SvgPath } from 'react-native-svg';
 
 //임시 리포트 데이터
 const MOCK_REPORT = { "indicator_1": { "report_explain": "🐢", "report_value": "🐢" }, "indicator_2": { "report_explain": "현재 마음 온도는 72.5도 지난주보다 15도 높아졌어요", "report_value": { "temp": "72.5", "msg": "15" } }, "indicator_3": { "report_explain": "이번 주 감정의 파동이 적절하게 유지되고 있습니다.", "report_value": [{ "created_at": "2026-04-01", "temp_val": 65.2 }, { "created_at": "2026-04-02", "temp_val": 70.1 }, { "created_at": "2026-04-03", "temp_val": 68.5 }] }, "indicator_4": { "report_explain": "루틴을 꾸준히 수행한 결과 회복 탄력성이 72.5%로 높게 나타납니다.", "report_value": "72.5%" }, "indicator_5": { "report_explain": "산책 루틴이 당신의 기분을 가장 빠르게 회복시켜 주었습니다.", "report_value": [{ "routine": "산책", "effect": 85 }, { "routine": "명상", "effect": 60 }] }, "indicator_6": { "report_explain": "14일 중 12일 기록 성공", "report_value": "12" }, "indicator_7": { "report_explain": "루틴 수행 여부에 따라 에너지가 15도 변화하는 패턴이 확인됩니다.", "report_value": "15" }, "indicator_8": { "report_explain": "🛡️ 이번 주 5번의 급격한 감정 하락 방어", "report_value": "5" }, "indicator_9": { "report_explain": "🔴 [8, 15, 22]개의 레드존 포인트가 감지되었습니다.", "report_value": [8, 15, 22] }, "indicator_10": { "report_explain": "사용자님의 감정점수는 AI 예측과 3.5도 차이가 나요.", "report_value": { "user": 72.5, "ai": 69.0, "gap": 3.5 } }, "indicator_11": { "report_explain": "이번 주 당신을 괴롭힌 키워드는 '업무', '불면', '관계'입니다.", "report_value": ["업무", "불면", "관계"] }, "indicator_12": { "report_explain": "현재 패턴 유지 시 위기 도달 확률은 27.5%입니다.", "report_value": "27.5" } };
-
+//루틴 데이터 구조
+interface routineData {
+  user_routine_id: number;
+  content: string;
+  is_completed: boolean;
+}
 //현제 데이터 구조
 interface currentData {
   user_id: string;
   is_onboarding_done?: boolean;
-  user_animal: string | null;
   assigned_category: string | null;
-  signup_date: string;
-  weekly_analysis?: ReportResult | { status: 'no_data' } | null;
-  recommendations?: string[];
+  animal_category: string | null;
+  animal_emoji: string | null;
+  animal_description: string | null;
   diagnosis_result?: {
     total_score: number;
     result_message: string;
   };
-  today_routines?: string[];
+  today_routines?: routineData[];
 }
 
 //백엔드에서 데이터 불러오기
@@ -82,53 +86,68 @@ const normalizeWeeklyAnalysis = (weeklyAnalysis: currentData['weekly_analysis'])
   return weeklyAnalysis as ReportResult;
 };
 
-// 💡 루틴 메모장 영역
-const Routines = ({ routines, userID }: { routines: string[] | undefined, userID: string }) => {
-  const toggleRoutine = async (routine: string, isDone: boolean) => {
+interface RoutinesProps {
+  routines: routineData[] | undefined;
+}
+// 루틴 목록 컴포넌트
+const Routines = ({ routines: initialRoutines }: RoutinesProps) => {
+  const [localRoutines, setLocalRoutines] = useState<routineData[]>([]);
+
+  useEffect(() => {
+    if (initialRoutines) {
+      setLocalRoutines(initialRoutines);
+    }
+  }, [initialRoutines]);
+
+  // 루틴 토글 함수
+  const toggleRoutine = async (routineId: number, currentStatus: boolean) => {
+    const nextStatus = !currentStatus;
+
+    // 💡 낙관적 업데이트: 서버 응답 전에 UI 상태부터 쓱 바꾸기
+    setLocalRoutines(prev =>
+      prev.map(r => r.user_routine_id === routineId ? { ...r, is_completed: nextStatus } : r)
+    );
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/diary/routine`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: userID,
-          routine_name: routine,
-          is_done: isDone
-        })
+      // 🔗 PATCH 메서드로 해당 URL에 바로 찌르기
+      const response = await fetch(`${API_BASE_URL}/api/routines/complete/${routineId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' }
+        // 백엔드에서 URL 파라미터만 받아 처리하므로 body는 과감히 생략합니다.
       });
+
       if (!response.ok) {
-        console.error("루틴 상태 업데이트 실패");
+        throw new Error("루틴 상태 업데이트 실패");
       }
+
+      // 백엔드 응답을 확인하고 싶다면 아래 주석을 해제하세요.
+      // const data = await response.json(); // { "message": "routine completed!" }
+
     } catch (error) {
       console.error("네트워크 오류:", error);
+
+      // 서버 통신 실패 시 원래 상태로 롤백(안전장치)
+      setLocalRoutines(prev =>
+        prev.map(r => r.user_routine_id === routineId ? { ...r, is_completed: currentStatus } : r)
+      );
     }
   };
 
   return (
     <View style={styles.milkyCard}>
-      <View style={styles.highlightedTitleContainer}>
-        <View style={styles.highlighter}>
-          <View style={styles.highlighterEnd} />
-        </View>
-        <Text style={styles.sectionTitle}>오늘의 숲 가꾸기</Text>
-      </View>
-
-      <View style={styles.routineListContainer}>
-        {routines && routines.length > 0 ? (
-          routines.map((routine, index) => (
-            <View key={index} style={styles.routineItem}>
-              <Checkbox
-                onCheck={() => toggleRoutine(routine, true)}
-                onUncheck={() => toggleRoutine(routine, false)}
-              >
-                <Text style={styles.routineText}>{routine}</Text>
-              </Checkbox>
-            </View>
-          ))
-        ) : (
-          <Text style={styles.emptyRoutineText}>아직 등록된 루틴이 없어요.</Text>
-        )}
-      </View>
-    </View>)
+      {localRoutines?.map((routine) => (
+        <TouchableOpacity
+          key={routine.user_routine_id}
+          style={styles.routineItem}
+          onPress={() => toggleRoutine(routine.user_routine_id, routine.is_completed)}
+        >
+          <Text>
+            {routine.is_completed ? '✅ ' : '⬜ '} {routine.content}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
 };
 
 const MainScreen = () => {
@@ -167,7 +186,7 @@ const MainScreen = () => {
   const startCategorySurvey = async () => {
     // 동물 유형에 따른 설문 타입 매핑
     let surveyType = currentUserData?.assigned_category;
-    if (currentUserData?.user_animal === "조용히 움츠린 거북이") {
+    if (currentUserData?.animal_category === "조용히 움츠린 거북이") {
       surveyType = "DEPRESSION";
     }
 
@@ -262,7 +281,9 @@ const MainScreen = () => {
           {currentUserData && (
             <View style={{ backgroundColor: '#f0f0f0', padding: 10, borderRadius: 8, marginVertical: 8, alignItems: 'center' }}>
               <Text style={{ fontSize: 12, color: '#333', fontWeight: 'bold', marginBottom: 4 }}>[디버그: 사용자 정보]</Text>
-              <Text style={{ fontSize: 12, color: '#555' }}>동물 유형: {user?.user_animal || '없음'}</Text>
+              <Text style={{ fontSize: 12, color: '#555' }}>동물 유형: {user?.animal_category || '없음'}</Text>
+              <Text style={{ fontSize: 12, color: '#555' }}>동물 이모지: {user?.animal_emoji || '없음'}</Text>
+              <Text style={{ fontSize: 12, color: '#555' }}>동물 설명: {user?.animal_description || '없음'}</Text>
               <Text style={{ fontSize: 12, color: '#555' }}>배정 카테고리: {user?.assigned_category || '없음'}</Text>
             </View>
           )}
@@ -295,7 +316,7 @@ const MainScreen = () => {
         </View>
 
         {/* 오늘의 루틴 */}
-        <Routines routines={currentUserData?.recommendations} userID={user.user_id} />
+        <Routines routines={currentUserData?.today_routines} />
 
         {/* 로그아웃 버튼 */}
         <TouchableOpacity onPress={handleLogOut} style={styles.logoutBtn}>

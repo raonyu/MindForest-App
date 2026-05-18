@@ -60,7 +60,7 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
     }
 
     setIsLoading(true);
-    const endpoint = authAction === 'login' ? '/api/user/api/login' : '/api/user/api/signup';
+    const endpoint = authAction === 'login' ? '/api/user/login' : '/api/user/signup';
 
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -154,7 +154,7 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
   const FormView = () => (
     <View style={styles.formViewContainer}>
       <TouchableOpacity style={styles.backButton} onPress={() => setScreenStep(0)}>
-      <Text style={styles.backButtonText}>
+        <Text style={styles.backButtonText}>
           <Text style={styles.arrowIcon}>◀</Text> 밖으로 나가기
         </Text>
       </TouchableOpacity>
