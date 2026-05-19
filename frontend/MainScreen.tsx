@@ -248,6 +248,16 @@ const MainScreen = () => {
       return () => setBottomBarContent(null);
     }
   }, [isFocused]);
+  //감정점수가 높아졌을 때 경고문 띄우기
+  useEffect(() => {
+    if (currentUserData?.diagnosis_result?.total_score !== undefined && currentUserData.diagnosis_result.total_score >= 20) {
+      Alert.alert(
+        "알림",
+        "현재 감정점수가 높게 측정되었습니다.\n루틴 수행을 추천드립니다.",
+        [{ text: "확인" }]
+      );
+    }
+  }, [currentUserData?.diagnosis_result?.total_score]);
 
   return (
     // 💡 하단 여백 너머로 회색이 비치지 않도록 전체 배경을 모눈종이 색상(#fafafa)으로 칠합니다!
