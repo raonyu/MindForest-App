@@ -99,7 +99,7 @@ const Routines = ({ routines: initialRoutines }: RoutinesProps) => {
     }
   }, [initialRoutines]);
 
-  // 루틴 토글 함수
+  // 체크박스 선택했을 때 토글 함수
   const toggleRoutine = async (routineId: number, currentStatus: boolean) => {
     const nextStatus = !currentStatus;
 
@@ -297,7 +297,7 @@ const MainScreen = () => {
 
         {/* 젤리 버튼 그룹 */}
         <View style={styles.buttonGroup}>
-          <TouchableOpacity activeOpacity={0.8} style={styles.unifiedBtnWrapper} onPress={() => { navigation.navigate("채팅"); requestSurvey(); }}>
+          <TouchableOpacity activeOpacity={0.8} style={styles.unifiedBtnWrapper} onPress={() => { navigation.navigate("채팅", { initialMessage: "사전 테스트 시작하기" }); requestSurvey(); }}>
             <View style={styles.unifiedBtnInner}>
               <Text style={styles.unifiedBtnText}>마음의 숲 사전 테스트 🌱</Text>
             </View>
