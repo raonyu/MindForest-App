@@ -276,7 +276,7 @@ const MainScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        <ReportModal isVisible={reportModalVisible} data={reportData ?? null} onClose={() => setReportModalVisible(false)} />
+        <ReportModal isVisible={reportModalVisible} data={MOCK_REPORT as unknown as ReportResult} onClose={() => setReportModalVisible(false)} />
 
         {/* 환영 카드 */}
         <View style={styles.milkyCard}>
