@@ -31,6 +31,7 @@ interface currentData {
     result_message: string;
   };
   today_routines?: routineData[];
+  weekly_analysis?: any;
 }
 
 //백엔드에서 데이터 불러오기
