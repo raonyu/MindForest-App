@@ -21,7 +21,6 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
   //애니메이션 엔진
   const bounceAnims = useRef(titleArray.map(() => new Animated.Value(0))).current;
 
-
   useEffect(() => {
     const runAnimation = () => {
       const animations = bounceAnims.map((anim: Animated.Value) =>
@@ -51,7 +50,6 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
 
     runAnimation();
   }, [bounceAnims]);
-
 
   const startAuth = async () => {
     if (!inputId.trim() || !password.trim()) {
@@ -103,7 +101,8 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
     }
   };
 
-  const WelcomeView = () => (
+  // ✅ 변경점 1: 컴포넌트가 아닌 일반 렌더링 함수로 변경
+  const renderWelcomeView = () => (
     <View style={styles.welcomeContainer}>
       <View style={styles.welcomeTextContainer}>
         <Text style={styles.subTitle}>나만의 작은 휴식처</Text>
@@ -151,7 +150,8 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
     </View>
   );
 
-  const FormView = () => (
+  // ✅ 변경점 2: 컴포넌트가 아닌 일반 렌더링 함수로 변경
+  const renderFormView = () => (
     <View style={styles.formViewContainer}>
       <TouchableOpacity style={styles.backButton} onPress={() => setScreenStep(0)}>
         <Text style={styles.backButtonText}>
@@ -211,7 +211,8 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
     >
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
         <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
-          {screenStep === 0 ? <WelcomeView /> : <FormView />}
+          {/* ✅ 변경점 3: 태그 방식이 아닌 함수 실행 방식으로 호출 */}
+          {screenStep === 0 ? renderWelcomeView() : renderFormView()}
         </ScrollView>
       </KeyboardAvoidingView>
     </ImageBackground>
@@ -301,7 +302,7 @@ const styles = StyleSheet.create({
   },
   arrowIcon: {
     fontFamily: 'MemomentKkukkukk',
-    fontSize: 15, // 기호가 너무 작아 보이면 이 숫자를 조절하세요!
+    fontSize: 15,
   },
   formTitleContainer: {
     alignItems: 'center',

@@ -11,7 +11,10 @@
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
-		155EE11C7E2945F5B4CD5398 /* NanumSquareRoundR.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F920EDBC6D1C4E2AB7E3EFBF /* NanumSquareRoundR.ttf */; };
+		7A4F85027B45468CB1C76183 /* Galmuri9.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3406D687B1DB4661B83BC15D /* Galmuri9.ttf */; };
+		95FF0F774F254252A507113C /* MemomentKkukkukk.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 1C3738CC75204C0298EC3174 /* MemomentKkukkukk.ttf */; };
+		F35DEA85377F4C7E84DFB931 /* NanumSquareRoundR.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B0E3BFABF7E4472DABF580D4 /* NanumSquareRoundR.ttf */; };
+		FD2F7EBDBA424BA3A07D1D27 /* ownglyph.ttf in Resources */ = {isa = PBXBuildFile; fileRef = D65B759E20BE4740979C7886 /* ownglyph.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -25,7 +28,10 @@
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = MindForest/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = MindForest/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
-		F920EDBC6D1C4E2AB7E3EFBF /* NanumSquareRoundR.ttf */ = {isa = PBXFileReference; name = "NanumSquareRoundR.ttf"; path = "../assets/fonts/NanumSquareRoundR.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		3406D687B1DB4661B83BC15D /* Galmuri9.ttf */ = {isa = PBXFileReference; name = "Galmuri9.ttf"; path = "../assets/fonts/Galmuri9.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		1C3738CC75204C0298EC3174 /* MemomentKkukkukk.ttf */ = {isa = PBXFileReference; name = "MemomentKkukkukk.ttf"; path = "../assets/fonts/MemomentKkukkukk.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		B0E3BFABF7E4472DABF580D4 /* NanumSquareRoundR.ttf */ = {isa = PBXFileReference; name = "NanumSquareRoundR.ttf"; path = "../assets/fonts/NanumSquareRoundR.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
+		D65B759E20BE4740979C7886 /* ownglyph.ttf */ = {isa = PBXFileReference; name = "ownglyph.ttf"; path = "../assets/fonts/ownglyph.ttf"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = unknown; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -103,7 +109,10 @@
 		A318E0FE9CF240E1AE5AA963 /* Resources */ = {
 			isa = "PBXGroup";
 			children = (
-				F920EDBC6D1C4E2AB7E3EFBF /* NanumSquareRoundR.ttf */,
+				3406D687B1DB4661B83BC15D /* Galmuri9.ttf */,
+				1C3738CC75204C0298EC3174 /* MemomentKkukkukk.ttf */,
+				B0E3BFABF7E4472DABF580D4 /* NanumSquareRoundR.ttf */,
+				D65B759E20BE4740979C7886 /* ownglyph.ttf */,
 			);
 			name = Resources;
 			sourceTree = "<group>";
@@ -171,7 +180,10 @@
 			files = (
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
-				155EE11C7E2945F5B4CD5398 /* NanumSquareRoundR.ttf in Resources */,
+				7A4F85027B45468CB1C76183 /* Galmuri9.ttf in Resources */,
+				95FF0F774F254252A507113C /* MemomentKkukkukk.ttf in Resources */,
+				F35DEA85377F4C7E84DFB931 /* NanumSquareRoundR.ttf in Resources */,
+				FD2F7EBDBA424BA3A07D1D27 /* ownglyph.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
