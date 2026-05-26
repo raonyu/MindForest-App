@@ -2,8 +2,20 @@
   "migIndex": 1,
   "data": [
     {
+      "path": "assets/fonts/Galmuri9.ttf",
+      "sha1": "e6bfecdd01ee199adead6976cfcd0b7cf8481de1"
+    },
+    {
+      "path": "assets/fonts/MemomentKkukkukk.ttf",
+      "sha1": "27e92212f84923f01e0475056dd7af5d71b22d7b"
+    },
+    {
       "path": "assets/fonts/NanumSquareRoundR.ttf",
       "sha1": "f0c70764bea3fab551e1dedaae059d4495afd8db"
+    },
+    {
+      "path": "assets/fonts/ownglyph.ttf",
+      "sha1": "58cc2b6ae63bd7fe7c4101420dd4760718fff76a"
     }
   ]
 }

@@ -11,7 +11,6 @@ interface ResizableElementProps {
 }
 
 const ResizableElement: React.FC<ResizableElementProps> = ({ el, isSelected, onSelect, onUpdate, onRemove, zIndex }) => {
-  // 기본 드래그 이동을 위한 PanResponder
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -33,51 +32,49 @@ const ResizableElement: React.FC<ResizableElementProps> = ({ el, isSelected, onS
         isSelected && styles.selectedWrapper
       ]}
     >
-      {/* 스티커 본체 */}
       <TouchableOpacity activeOpacity={1} onPress={() => onSelect(el.id)} {...panResponder.panHandlers}>
         {el.stickerType === 'image' ? (
           <Image source={el.source} style={{ width: el.size, height: el.size, resizeMode: 'contain' }} />
         ) : (
-          <Text style={{ fontSize: el.size }}>{el.content}</Text>
+          <Text style={{ fontSize: el.size, fontFamily: 'Galmuri9' }}>{el.content}</Text>
         )}
       </TouchableOpacity>
 
-      {/* 선택 시 나타나는 상하좌우 모서리 제어 버튼들 */}
       {isSelected && (
         <>
-          {/* 확인 버튼: 왼쪽 위 */}
+          {/* 💡 확인 버튼: O - 요청하신 파란색 배경에 하얀 글씨로 변경 */}
           <TouchableOpacity style={styles.confirmBtn} onPress={() => onSelect(null)}>
-            <Text style={{ fontSize: 12 }}>✅</Text>
+            <Text style={[styles.iconText, { color: 'white' }]}>O</Text>
           </TouchableOpacity>
 
-          {/* 삭제 버튼: 오른쪽 위 */}
+          {/* 삭제 버튼: X */}
           <TouchableOpacity style={styles.deleteBtn} onPress={() => onRemove(el.id)}>
-            <Text style={styles.btnText}>✕</Text>
+            <Text style={[styles.iconText, { color: 'white' }]}>X</Text>
           </TouchableOpacity>
 
-          {/* 확대 버튼: 오른쪽 아래 */}
+          {/* 확대 버튼 (+) : 시각적 균형을 위해 사이즈 16 적용 */}
           <TouchableOpacity style={styles.resizeBtn} onPress={() => onUpdate(el.id, { size: el.size + 10 })}>
-            <Text style={styles.btnText}>➕</Text>
+            <Text style={[styles.iconText, { fontSize: 16 }]}>+</Text>
           </TouchableOpacity>
 
-          {/* 축소 버튼: 왼쪽 아래 */}
+          {/* 축소 버튼 (-) : 시각적 균형을 위해 사이즈 16 적용 */}
           <TouchableOpacity style={styles.shrinkBtn} onPress={() => onUpdate(el.id, { size: Math.max(20, el.size - 10) })}>
-            <Text style={styles.btnText}>➖</Text>
+            <Text style={[styles.iconText, { fontSize: 16 }]}>-</Text>
           </TouchableOpacity>
 
-          {/* 💡 새로 추가된 하단 이동 제어 방향키 버튼 바 */}
+          {/* 💡 방향키 버튼 바: "리퀴드 글래스" 질감 및 우윳빛 색상 적용 컴포넌트 */}
           <View style={styles.moveControlBar}>
             <TouchableOpacity style={styles.arrowBtn} onPress={() => onUpdate(el.id, { y: (el.y || 0) - 5 })}>
-              <Text style={styles.arrowText}>⬆️</Text>
+              <Text style={styles.arrowText}>▲</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.arrowBtn} onPress={() => onUpdate(el.id, { y: (el.y || 0) + 5 })}>
-              <Text style={styles.arrowText}>⬇️</Text>
+              <Text style={styles.arrowText}>▼</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.arrowBtn} onPress={() => onUpdate(el.id, { x: (el.x || 0) - 5 })}>
-              <Text style={styles.arrowText}>⬅️</Text>
+              <Text style={styles.arrowText}>◀</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.arrowBtn} onPress={() => onUpdate(el.id, { x: (el.x || 0) + 5 })}>
-              <Text style={styles.arrowText}>➡️</Text>
+              <Text style={styles.arrowText}>▶</Text>
             </TouchableOpacity>
           </View>
         </>
@@ -91,20 +88,20 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,               // 💡 투명한 2px 테두리로 자리 확보
+    borderWidth: 2,               
     borderColor: 'transparent',
   },
   selectedWrapper: { 
-    borderColor: '#7ec96d',       // 💡 선택 시 색깔만 짠! 하고 나타나게
+    borderColor: '#98cbf1',
     borderStyle: 'dashed'
   },
   
-  // 모서리 버튼들 스타일
+  // 모서리 버튼들 공통 및 개별 스타일 정의 (규격 및 좌표 통일)
   confirmBtn: { 
     position: 'absolute', 
     top: -10, 
     left: -10, 
-    backgroundColor: 'white', 
+    backgroundColor: '#98cbf1', // 💡 요청하신 파란색 배경
     width: 24, 
     height: 24, 
     borderRadius: 12, 
@@ -125,44 +122,64 @@ const styles = StyleSheet.create({
     height: 24, 
     borderRadius: 12, 
     justifyContent: 'center', 
-    alignItems: 'center' 
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000', 
+    shadowOpacity: 0.1, 
+    shadowRadius: 2, 
+    shadowOffset: { width: 0, height: 1 } 
   },
   resizeBtn: { 
     position: 'absolute', 
     bottom: -10, 
-    right: -10, 
-    backgroundColor: '#7ec96d', 
+    left: -10,
+    backgroundColor: 'white', // 하얀 배경
     width: 24, 
     height: 24, 
     borderRadius: 12, 
     justifyContent: 'center', 
-    alignItems: 'center' 
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000', 
+    shadowOpacity: 0.1, 
+    shadowRadius: 2, 
+    shadowOffset: { width: 0, height: 1 } 
   },
   shrinkBtn: { 
     position: 'absolute', 
     bottom: -10, 
-    left: -10, 
-    backgroundColor: '#7ec96d', 
+    right: -10,
+    backgroundColor: 'white', // 하얀 배경
     width: 24, 
     height: 24, 
     borderRadius: 12, 
     justifyContent: 'center', 
-    alignItems: 'center' 
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000', 
+    shadowOpacity: 0.1, 
+    shadowRadius: 2, 
+    shadowOffset: { width: 0, height: 1 } 
   },
-  btnText: { 
-    color: 'white', 
-    fontSize: 12, 
-    fontWeight: 'bold' 
+  
+  iconText: { 
+    fontFamily: 'Galmuri9',
+    color: '#333', 
+    fontSize: 12, // 💡 기본 크기 12px (+, - 버튼은 인라인 스타일로 16px 적용)
+    includeFontPadding: false,
+    textAlignVertical: 'center'
   },
 
-  // 💡 하단 미세 이동 버튼 바 스타일
+  // 💡 방향키 버튼 바: "리퀴드 글래스" 질감 및 우윳빛 색상 적용
   moveControlBar: {
     flexDirection: 'row',
     position: 'absolute',
     top: '100%',
+    left: '50%', // 중앙 정렬용
+    marginLeft: -66, // 가로 폭(28*4+6*3+4*2)의 절반값
     marginTop: 18,
-    backgroundColor: 'white',
-    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)', // 💡 우윳빛 질감 및 투명도
+    borderRadius: 14, // 💡 더 둥근 모서리
     padding: 4,
     gap: 6,
     elevation: 4,
@@ -173,15 +190,20 @@ const styles = StyleSheet.create({
   },
   arrowBtn: {
     padding: 4,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 6,
+    backgroundColor: '#EAEAEA', // 회색 네모 배경 (기존 느낌 유지)
+    borderRadius: 8, // 조금 더 둥글게
     width: 28,
     height: 28,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  
   arrowText: {
-    fontSize: 14,
+    fontFamily: 'Galmuri9',
+    fontSize: 10, // 화살표 크기 미세 조정
+    color: '#333',
+    includeFontPadding: false,
+    textAlignVertical: 'center'
   }
 });
 

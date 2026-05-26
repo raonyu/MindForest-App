@@ -51,7 +51,10 @@
 	<false/>
 	<key>UIAppFonts</key>
 	<array>
+		<string>Galmuri9.ttf</string>
+		<string>MemomentKkukkukk.ttf</string>
 		<string>NanumSquareRoundR.ttf</string>
+		<string>ownglyph.ttf</string>
 	</array>
 </dict>
 </plist>
