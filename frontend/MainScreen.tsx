@@ -75,6 +75,22 @@ const fetchEmotionData = async (userID: string): Promise<emotionData | null> => 
   }
 }
 
+const fetchReportData = async (userID: string): Promise<any | null> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/analysis/report/${userID}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('리포트 데이터 불러오기 실패:', error);
+    return null;
+  }
+}
+
 const normalizeWeeklyAnalysis = (weeklyAnalysis: currentData['weekly_analysis']): ReportResult | null => {
   if (!weeklyAnalysis) return null;
   if ((weeklyAnalysis as { status?: string }).status === 'no_data') return null;
@@ -152,6 +168,7 @@ const MainScreen = () => {
   const { handleLogOut, user, setUser } = useMainContext();
   const [currentUserData, setCurrentUserData] = useState<currentData | null>(null);
   const [emotionMessage, setEmotionMessage] = useState<emotionData | null>(null);
+  const [reportData, setReportData] = useState<any>(null);
 
   const requestSurvey = async () => {
     try {
@@ -211,6 +228,11 @@ const MainScreen = () => {
       }
       const emotionData = await fetchEmotionData(user.user_id);
       if (emotionData) setEmotionMessage(emotionData);
+
+      const report = await fetchReportData(user.user_id);
+      if (report) {
+        setReportData(report);
+      }
     }
     if (isFocused) load();
   }, [user.user_id, isFocused]);
@@ -236,7 +258,7 @@ const MainScreen = () => {
   return (
     <View style={{ flex: 1, backgroundColor: '#F4F5F9' }}>
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        <ReportModal isVisible={reportModalVisible} data={MOCK_REPORT as unknown as ReportResult} onClose={() => setReportModalVisible(false)} />
+        <ReportModal isVisible={reportModalVisible} data={reportData ?? null} onClose={() => setReportModalVisible(false)} />
 
         {/* 헤더 영역 */}
         <View style={styles.header}>
