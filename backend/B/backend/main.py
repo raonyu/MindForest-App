@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from database import engine, get_db
 import models, uvicorn
 # [수정] 우리가 업데이트한 라우터들을 임포트합니다.
-from routers import user, diary, analysis, survey, chatbot, animal, routines
+from routers import user, diary, analysis, survey, chatbot, animal, routines, chat_history
 
 # 1. DB 테이블 자동 생성 및 스키마 업데이트
 # 요구사항 1(필드 추가)과 2(타임존)가 반영된 models.py를 기준으로 테이블을 생성/업데이트합니다.
@@ -35,6 +35,7 @@ app.include_router(survey.router, prefix="/api/survey", tags=["Clinical Survey"]
 app.include_router(chatbot.router, prefix="/api/chatbot", tags=["Onboarding Chatbot"])
 app.include_router(animal.router, prefix="/api/animal", tags=["Animals"])
 app.include_router(routines.router, prefix="/api/routines", tags=["Routines"])
+app.include_router(chat_history.router, prefix="/api/chat-history", tags=["Chat History"])
 
 # 4. 서비스 헬스 체크용 엔드포인트
 @app.get("/")
