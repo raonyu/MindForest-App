@@ -380,7 +380,9 @@ const ChatScreen = () => {
       return (
         <View style={[styles.messageContainer, styles.aiRow]}>
           <View style={styles.profileWrapper}>
-            <Image source={require('./assets/profile_icon.png')} style={styles.profileImage} />
+            <View style={[styles.profileImage, { justifyContent: 'center', alignItems: 'center' }]}>
+              <Text style={{ fontSize: 24 }}>{user?.animal_emoji || '🌱'}</Text>
+            </View>
           </View>
           <View style={styles.bubbleAndTime}>
             <ResultBubble
@@ -402,7 +404,9 @@ const ChatScreen = () => {
         {/** 프로필 이미지 영역 (AI만 표시)*/}
         {!isUser && (
           <View style={styles.profileWrapper}>
-            <Image source={require('./assets/profile_icon.png')} style={styles.profileImage} />
+            <View style={[styles.profileImage, { justifyContent: 'center', alignItems: 'center' }]}>
+              <Text style={{ fontSize: 24 }}>{user?.animal_emoji || '🌱'}</Text>
+            </View>
           </View>
         )}
 
