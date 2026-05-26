@@ -11,14 +11,29 @@ import AngryEmoji from './assets/icons/AngryEmoji';
 import AnxiousEmoji from './assets/icons/AnxiousEmoji';
 // @ts-ignore
 import CryingEmoji from './assets/icons/CryingEmoji';
+// @ts-ignore
+import ExcitedEmoji from './assets/icons/ExcitedEmoji';
+// @ts-ignore
+import PeacefulEmoji from './assets/icons/PeacefulEmoji';
+// @ts-ignore
+import GloomyEmoji from './assets/icons/GloomyEmoji';
+
 
 export const EMOTIONS = [
-  { id: 'joy', color: '#FF5B5B', icon: JoyEmoji },
-  { id: 'calm', color: '#64E671', icon: CalmEmoji },
+  // 1번째 줄 (슬픔, 분노, 평온)
   { id: 'sadness', color: '#FFB661', icon: SadEmoji },
   { id: 'anger', color: '#FFD25E', icon: AngryEmoji },
+  { id: 'calm', color: '#64E671', icon: CalmEmoji },
+  
+  // 2번째 줄 (기쁨, 불안, 눈물)
+  { id: 'joy', color: '#FF5B5B', icon: JoyEmoji },
   { id: 'anxiety', color: '#FF6187', icon: AnxiousEmoji },
   { id: 'crying', color: '#E961FF', icon: CryingEmoji },
+  
+  // 3번째 줄 (신남, 평화, 우울)
+  { id: 'excited', color: '#56EACF', icon: ExcitedEmoji },
+  { id: 'peaceful', color: '#5B9CFF', icon: PeacefulEmoji },
+  { id: 'gloomy', color: '#8A5CFF', icon: GloomyEmoji },
 ];
 
 export const BACKGROUNDS = [
@@ -267,7 +282,6 @@ export const HIGHLIGHTERS = [
   { id: 'pastel_purple', color: 'rgba(221, 160, 221, 0.55)', name: '파스텔보라', type: 'color' },
   { id: 'pastel_mint', color: 'rgba(184, 242, 230, 0.55)', name: '파스텔민트', type: 'color' },
   
-  // 💡 패턴들도 ./assets/ 로 수정 완료!
   { id: 'dot1', texture: require('./assets/patterns/dot1.png'), name: '도트1', type: 'pattern', design: 'dot' },
   { id: 'dot2', texture: require('./assets/patterns/dot2.png'), name: '도트2', type: 'pattern', design: 'dot' },
   { id: 'dot3', texture: require('./assets/patterns/dot3.png'), name: '도트2', type: 'pattern', design: 'dot' },

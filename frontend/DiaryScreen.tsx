@@ -623,8 +623,22 @@ const styles = StyleSheet.create({
   modalDragHandle: { width: 40, height: 4, backgroundColor: '#555', borderRadius: 2, marginBottom: 20 },
   modalDateText: { fontSize: 13, color: '#999', marginBottom: 8 },
   modalTitleText: { fontSize: 18, color: '#ffffff', fontWeight: 'bold', marginBottom: 30 },
-  modalEmotionGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 20 },
-  modalEmotionItem: { padding: 10, margin: 5 },
+
+  // 💡 수정된 부분: 이모지가 9개(또는 그 이상)가 되어도 예쁘게 줄바꿈되도록 수정
+  modalEmotionGrid: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    justifyContent: 'center', 
+    gap: 15, // 이모지 사이의 간격
+    width: '100%' // 그리드가 꽉 차게 해서 균형을 맞춤
+  },
+
+  modalEmotionItem: { 
+    padding: 10, 
+    // 💡 화면 넓이에 맞춰 한 줄에 3~4개씩 적절히 들어가도록 여백 조정
+    marginHorizontal: 5, 
+    marginBottom: 10 
+  },
 
   dakkuContainer: { flex: 1, backgroundColor: '#f9f9f9', paddingTop: Platform.OS === 'ios' ? 50 : 20 },
   dakkuHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 20, paddingVertical: 10, height: 90 },
