@@ -38,31 +38,39 @@ const getTemperatureColor = (tempStr: string | number) => {
     return `hsl(0, ${saturation}%, ${lightness}%)`;
 };
 
-const IndicatorCard = ({ index, data, title }: { index: number, data: ReportItems, title: string }) => {
+const IndicatorCard = ({ index, data, title }: { index: number, data: any, title: string }) => {
     if (!data) return null;
+
+    // 백엔드 데이터 구조가 일관되지 않을 수 있으므로, report_value로 래핑되어 있는지 확인합니다.
+    const hasReportValue = data && typeof data === 'object' && !Array.isArray(data) && 'report_value' in data;
+    const reportValue = hasReportValue ? data.report_value : data;
+    const reportExplain = hasReportValue ? data.report_explain : null;
 
     const renderVisualization = () => {
         switch(index) {
             case 0: // 주간 지배 감정
                 return (
                     <View style={styles.vizContainer}>
-                        <Text style={{ fontSize: 80, textAlign: 'center' }}>{data.report_value}</Text>
+                        <Text style={{ fontSize: 80, textAlign: 'center' }}>{reportValue}</Text>
                     </View>
                 );
             case 1: // 현재 마음 온도
-                const tempValue = data.report_value.temp;
+                if (!reportValue || typeof reportValue !== 'object') return null;
+                const tempValue = reportValue.temp || 0;
                 const bgColor = getTemperatureColor(tempValue);
                 return (
                     <View style={[styles.vizContainer, { backgroundColor: bgColor, borderRadius: 20, padding: 24, alignItems: 'center' }]}>
                         <Text style={{ fontSize: 48, color: 'white', fontWeight: 'bold' }}>{tempValue}°C</Text>
                         <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginTop: 14 }}>
-                            <Text style={{ fontSize: 15, color: 'white', fontWeight: '600' }}>지난 주 보다 {data.report_value.msg}°C 상승 📈</Text>
+                            <Text style={{ fontSize: 15, color: 'white', fontWeight: '600' }}>지난 주 보다 {reportValue.msg || 0}°C 상승 📈</Text>
                         </View>
                     </View>
                 );
             case 2: // 감정 롤러코스터 지수
-                const chartDate = data.report_value.map((item: any) => item.created_at.substring(5).replace('-', '/'));
-                const chartValue = data.report_value.map((item: any) => Number(item.temp_val));
+                const arr2 = Array.isArray(reportValue) ? reportValue : [];
+                if (arr2.length === 0) return <Text style={{textAlign: 'center', marginTop: 10, color: '#888'}}>데이터가 부족합니다.</Text>;
+                const chartDate = arr2.map((item: any) => item.created_at ? item.created_at.substring(5, 10).replace('-', '/') : '');
+                const chartValue = arr2.map((item: any) => Number(item.temp_val) || 0);
                 return (
                     <View style={[styles.vizContainer, { alignItems: 'center' }]}>
                         <LineChart
@@ -85,36 +93,38 @@ const IndicatorCard = ({ index, data, title }: { index: number, data: ReportItem
                     </View>
                 );
             case 3: // 회복 탄력성
+                const num3 = parseFloat(String(reportValue)) || 0;
                 return (
                     <View style={[styles.vizContainer, { alignItems: 'center', paddingVertical: 20 }]}>
                          <AnimatedCircularProgress
                             size={160}
                             width={16}
-                            fill={parseFloat(data.report_value)}
+                            fill={num3}
                             tintColor="#4d824f"
                             backgroundColor="#eaffdf"
                             lineCap="round"
                         >
-                            {() => <Text style={{ fontSize: 36, fontWeight: 'bold', color: '#4d824f' }}>{data.report_value}</Text>}
+                            {() => <Text style={{ fontSize: 36, fontWeight: 'bold', color: '#4d824f' }}>{typeof reportValue === 'string' ? reportValue : `${num3}%`}</Text>}
                         </AnimatedCircularProgress>
                     </View>
                 );
             case 4: // 루틴 효능 랭킹
-                const routines: {routine: string, effect: number}[] = data.report_value;
+                const arr4 = Array.isArray(reportValue) ? reportValue : [];
+                if (arr4.length === 0) return <Text style={{textAlign: 'center', marginTop: 10, color: '#888'}}>데이터가 부족합니다.</Text>;
                 const MAX_HEIGHT = 120;
                 return (
                     <View style={[styles.vizContainer, { flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'flex-end', height: MAX_HEIGHT + 60, marginTop: 20 }]}>
-                        {routines.map((item, idx) => (
+                        {arr4.map((item: any, idx: number) => (
                             <View key={idx} style={{ alignItems: 'center', width: 60 }}>
                                 <Text style={{ marginBottom: 8, fontWeight: 'bold', color: '#4d824f', fontSize: 16 }}>{item.effect}</Text>
-                                <View style={{ width: 44, height: MAX_HEIGHT * (item.effect / 100), backgroundColor: idx === 0 ? '#B7E6A4' : '#eaffdf', borderTopLeftRadius: 10, borderTopRightRadius: 10 }} />
+                                <View style={{ width: 44, height: MAX_HEIGHT * ((item.effect || 0) / 100), backgroundColor: idx === 0 ? '#B7E6A4' : '#eaffdf', borderTopLeftRadius: 10, borderTopRightRadius: 10 }} />
                                 <Text style={{ marginTop: 10, color: '#555', fontWeight: 'bold' }}>{item.routine}</Text>
                             </View>
                         ))}
                     </View>
                 );
             case 5: // 기록 성공률
-                const successDays = Number(data.report_value);
+                const successDays = Number(reportValue) || 0;
                 const totalDays = 14;
                 const percentage = (successDays / totalDays) * 100;
                 return (
@@ -132,25 +142,27 @@ const IndicatorCard = ({ index, data, title }: { index: number, data: ReportItem
                 return (
                     <View style={[styles.vizContainer, { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff8e1', padding: 24, borderRadius: 20, marginTop: 10 }]}>
                          <Text style={{ fontSize: 48 }}>⚡</Text>
-                         <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#f57c00', marginLeft: 16 }}>{data.report_value}° 변화</Text>
+                         <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#f57c00', marginLeft: 16 }}>{reportValue}° 변화</Text>
                     </View>
                 );
             case 7: // 마음 안전망 방어
+                const defenseCount = Number(reportValue) || 0;
                 return (
                     <View style={[styles.vizContainer, { backgroundColor: '#f0f4f8', padding: 20, borderRadius: 20, marginTop: 10, alignItems: 'center' }]}>
-                        <Text style={{ fontSize: 18, color: '#455a64', marginBottom: 16, fontWeight: 'bold' }}>이번 주 {data.report_value}번의 하락 방어</Text>
+                        <Text style={{ fontSize: 18, color: '#455a64', marginBottom: 16, fontWeight: 'bold' }}>이번 주 {defenseCount}번의 하락 방어</Text>
                         <View style={{ flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 12 }}>
-                            {Array.from({ length: Number(data.report_value) }).map((_, i) => (
+                            {Array.from({ length: defenseCount }).map((_, i) => (
                                 <Text key={i} style={{ fontSize: 36 }}>🛡️</Text>
                             ))}
                         </View>
                     </View>
                 );
             case 8: // 레드존 확인
-                const redZones: number[] = data.report_value;
+                const redZones = Array.isArray(reportValue) ? reportValue : [];
+                if (redZones.length === 0) return <Text style={{textAlign: 'center', marginTop: 10, color: '#888'}}>레드존이 감지되지 않았습니다.</Text>;
                 return (
                     <View style={[styles.vizContainer, { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 }]}>
-                        {redZones.map((zone, idx) => (
+                        {redZones.map((zone: any, idx: number) => (
                             <View key={idx} style={{ backgroundColor: '#ffebee', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 24, borderWidth: 1, borderColor: '#ffcdd2' }}>
                                 <Text style={{ color: '#d32f2f', fontWeight: 'bold', fontSize: 16 }}>🔴 {zone}일</Text>
                             </View>
@@ -158,7 +170,8 @@ const IndicatorCard = ({ index, data, title }: { index: number, data: ReportItem
                     </View>
                 );
             case 9: // 마음의 가면
-                const { user, ai, gap } = data.report_value;
+                if (!reportValue || typeof reportValue !== 'object') return null;
+                const { user, ai, gap } = reportValue as any;
                 return (
                     <View style={[styles.vizContainer, { marginTop: 10 }]}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
@@ -179,10 +192,11 @@ const IndicatorCard = ({ index, data, title }: { index: number, data: ReportItem
                     </View>
                 );
             case 10: // 아픔의 뿌리
-                const keywords: string[] = data.report_value;
+                const keywords = Array.isArray(reportValue) ? reportValue : [];
+                if (keywords.length === 0) return <Text style={{textAlign: 'center', marginTop: 10, color: '#888'}}>감지된 키워드가 없습니다.</Text>;
                 return (
                     <View style={[styles.vizContainer, { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 10 }]}>
-                        {keywords.map((kw, idx) => (
+                        {keywords.map((kw: any, idx: number) => (
                             <View key={idx} style={{ backgroundColor: '#e0f2f1', paddingHorizontal: 18, paddingVertical: 12, borderRadius: 24, borderWidth: 1, borderColor: '#b2dfdb' }}>
                                 <Text style={{ color: '#00796b', fontWeight: 'bold', fontSize: 16 }}># {kw}</Text>
                             </View>
@@ -190,12 +204,13 @@ const IndicatorCard = ({ index, data, title }: { index: number, data: ReportItem
                     </View>
                 );
             case 11: // 위기 도달 확률
+                const num11 = parseFloat(String(reportValue)) || 0;
                 return (
                     <View style={[styles.vizContainer, { alignItems: 'center', paddingVertical: 10 }]}>
                         <AnimatedCircularProgress
                             size={180}
                             width={18}
-                            fill={parseFloat(data.report_value)}
+                            fill={num11}
                             tintColor="#d32f2f"
                             backgroundColor="#ffebee"
                             lineCap="round"
@@ -204,7 +219,7 @@ const IndicatorCard = ({ index, data, title }: { index: number, data: ReportItem
                         >
                             {() => (
                                 <View style={{ alignItems: 'center' }}>
-                                    <Text style={{ fontSize: 40, color: '#d32f2f', fontWeight: 'bold' }}>{data.report_value}%</Text>
+                                    <Text style={{ fontSize: 40, color: '#d32f2f', fontWeight: 'bold' }}>{num11}%</Text>
                                     <Text style={{ fontSize: 14, color: '#777', marginTop: 4 }}>위험도</Text>
                                 </View>
                             )}
@@ -219,7 +234,7 @@ const IndicatorCard = ({ index, data, title }: { index: number, data: ReportItem
     return (
         <View style={styles.card}>
             <Text style={styles.cardTitle}>{title}</Text>
-            {data.report_explain && <Text style={styles.cardExplain}>{data.report_explain}</Text>}
+            {reportExplain && <Text style={styles.cardExplain}>{reportExplain}</Text>}
             {renderVisualization()}
         </View>
     );

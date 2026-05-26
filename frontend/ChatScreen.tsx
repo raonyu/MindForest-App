@@ -34,6 +34,7 @@ const MOCK_MESSAGES: Message[] = [
 */
 const MOCK_MESSAGES: Message[] = [
   { id: '1', text: "상대방 매세지", sender: 'ai', time: '오전 10:00' },
+  { id: '3', text: `{"is_finished": true,"result_emoji": "🐢","result_name": "조용히 숨 고르는 거북이"}`, sender: 'ai', time: '오전 12:00' }
 ];
 
 // 흔하게 발생하는 챗봇의 JSON 생성 오류(마크다운, 잉여 괄호, 오탈자 등)를 복구하여 파싱하는 헬퍼 함수
@@ -100,6 +101,9 @@ const ChatScreen = () => {
   const [surveyAnswers, setSurveyAnswers] = useState<any[]>([]);
   const [surveyType, setSurveyType] = useState<string>('');
 
+  // 동물 데이터 리스트
+  const [animalList, setAnimalList] = useState<any[]>([]);
+
   // 최초 진입 시 자동 메세지 전송 & 유형 설문조사 시작 확인
   useEffect(() => {
     if (route.params?.initialMessage) {
@@ -134,6 +138,21 @@ const ChatScreen = () => {
       };
       setMessages(prev => [...prev, aimag]);
     }
+
+    // 동물 도감 데이터 불러오기
+    const fetchAnimals = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/animal/all`);
+        if (response.ok) {
+          const data = await response.json();
+          setAnimalList(data);
+        }
+      } catch (e) {
+        console.error("동물 데이터 불러오기 실패:", e);
+      }
+    };
+    fetchAnimals();
+
   }, [route.params?.initialMessage, route.params?.surveyMode]);
 
   //백앤드 메세지 요청/응답 함수
@@ -304,8 +323,6 @@ const ChatScreen = () => {
             const parsedData = parseRobustJSON(lastMessage.text);
             if (parsedData && parsedData.is_finished === true) {
               isResultData = true;
-              setSurveyResult(parsedData);
-              setModalVisible(true);
               console.log('결과 데이터 파싱 성공', parsedData);
               setBottomBarContent(<ChatInput onSend={(inputText) => { handleSendMessage(inputText); }} />);
             }
@@ -377,6 +394,24 @@ const ChatScreen = () => {
 
     // 결과 말풍선인 경우 독립적으로 분리하여 렌더링
     if (surveyData && surveyData.is_finished === true) {
+      // 동물 데이터를 기반으로 이모지와 이름 매핑
+      let finalEmoji = surveyData.result_emoji;
+      let finalName = surveyData.result_name;
+
+      if (surveyData.category && animalList.length > 0) {
+        const matchedAnimal = animalList.find(a => a.category === surveyData.category);
+        if (matchedAnimal) {
+          finalEmoji = matchedAnimal.emoji;
+          finalName = matchedAnimal.name;
+        }
+      }
+
+      const displayData = {
+        ...surveyData,
+        result_emoji: finalEmoji || '🌱',
+        result_name: finalName || '결과를 분석 중입니다...',
+      };
+
       return (
         <View style={[styles.messageContainer, styles.aiRow]}>
           <View style={styles.profileWrapper}>
@@ -386,9 +421,9 @@ const ChatScreen = () => {
           </View>
           <View style={styles.bubbleAndTime}>
             <ResultBubble
-              data={surveyData}
+              data={displayData}
               onPress={() => {
-                setSurveyResult(surveyData);
+                setSurveyResult(displayData);
                 setModalVisible(true);
               }}
             />

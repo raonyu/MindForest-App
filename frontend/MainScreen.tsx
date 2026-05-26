@@ -77,7 +77,7 @@ const fetchEmotionData = async (userID: string): Promise<emotionData | null> => 
 
 const fetchReportData = async (userID: string): Promise<any | null> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/analysis/report/${userID}`, {
+    const response = await fetch(`${API_BASE_URL}/api/analysis/api/report/${userID}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
     });
@@ -136,25 +136,25 @@ const Routines = ({ routines: initialRoutines }: RoutinesProps) => {
       {localRoutines?.map((routine, index) => {
         const isLast = index === localRoutines.length - 1;
         return (
-            <TouchableOpacity
-                key={routine.user_routine_id}
-                style={[styles.routineItem, isLast && styles.routineItemLast]}
-                onPress={() => toggleRoutine(routine.user_routine_id, routine.is_completed)}
-                activeOpacity={0.7}
-            >
-                <View style={[styles.checkCircle, routine.is_completed && styles.checkCircleCompleted]}>
-                    {routine.is_completed && <Text style={{color: 'white', fontSize: 12, fontWeight: 'bold'}}>✓</Text>}
-                </View>
-                <View style={styles.routineTextContainer}>
-                    <Text style={routine.is_completed ? styles.routineTextCompleted : styles.routineText}>
-                        {routine.content}
-                    </Text>
-                </View>
-            </TouchableOpacity>
+          <TouchableOpacity
+            key={routine.user_routine_id}
+            style={[styles.routineItem, isLast && styles.routineItemLast]}
+            onPress={() => toggleRoutine(routine.user_routine_id, routine.is_completed)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.checkCircle, routine.is_completed && styles.checkCircleCompleted]}>
+              {routine.is_completed && <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>✓</Text>}
+            </View>
+            <View style={styles.routineTextContainer}>
+              <Text style={routine.is_completed ? styles.routineTextCompleted : styles.routineText}>
+                {routine.content}
+              </Text>
+            </View>
+          </TouchableOpacity>
         );
       })}
       {(!localRoutines || localRoutines.length === 0) && (
-          <Text style={{color: '#888', textAlign: 'center', padding: 10}}>오늘의 루틴이 없습니다.</Text>
+        <Text style={{ color: '#888', textAlign: 'center', padding: 10 }}>오늘의 루틴이 없습니다.</Text>
       )}
     </View>
   );
@@ -221,6 +221,7 @@ const MainScreen = () => {
 
   useEffect(() => {
     const load = async () => {
+      if (!user?.user_id) return;
       const data = await fetchCurrentData(user.user_id);
       if (data) {
         setCurrentUserData(data);
@@ -231,11 +232,11 @@ const MainScreen = () => {
 
       const report = await fetchReportData(user.user_id);
       if (report) {
-        setReportData(report);
+        setReportData(normalizeWeeklyAnalysis(report.weekly_analysis));
       }
     }
     if (isFocused) load();
-  }, [user.user_id, isFocused]);
+  }, [user?.user_id, isFocused]);
 
   useEffect(() => {
     if (isFocused) {
@@ -255,6 +256,8 @@ const MainScreen = () => {
   const completedRoutines = routines.filter(r => r.is_completed).length;
   const routineRate = routines.length > 0 ? Math.round((completedRoutines / routines.length) * 100) : 0;
 
+  if (!user) return null;
+
   return (
     <View style={{ flex: 1, backgroundColor: '#F4F5F9' }}>
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
@@ -262,85 +265,85 @@ const MainScreen = () => {
 
         {/* 헤더 영역 */}
         <View style={styles.header}>
-            <View>
-                <Text style={styles.headerGreeting}>안녕하세요,</Text>
-                <Text style={styles.headerName}>{user.user_id}님!</Text>
-            </View>
-            <View style={styles.profileIconPlaceholder}>
-                <Text style={{fontSize: 24}}>👤</Text>
-            </View>
+          <View>
+            <Text style={styles.headerGreeting}>안녕하세요,</Text>
+            <Text style={styles.headerName}>{user.user_id}님!</Text>
+          </View>
+          <View style={styles.profileIconPlaceholder}>
+            <Text style={{ fontSize: 24 }}>👤</Text>
+          </View>
         </View>
 
         {/* 감정 메시지 알림바 */}
         {emotionMessage?.message && (
-            <View style={styles.messageAlert}>
-                <Text style={styles.messageText}>💡 {user?.diagnosis_result?.result_message || emotionMessage?.message}</Text>
-            </View>
+          <View style={styles.messageAlert}>
+            <Text style={styles.messageText}>💡 {user?.diagnosis_result?.result_message || emotionMessage?.message}</Text>
+          </View>
         )}
 
         {/* 중앙 메인 동물 카드 */}
         <View style={styles.mainCard}>
-            <View style={styles.mainCardContent}>
-                {/* 중앙 동물 캐릭터 */}
-                <View style={styles.animalCenter}>
-                    <Text style={styles.animalEmoji}>{user?.animal_emoji || '🌱'}</Text>
-                </View>
-
-                {/* 정보 및 진행률 행 */}
-                <View style={styles.cardInfoRow}>
-                    <View style={styles.cardTextInfo}>
-                        <Text style={styles.animalCategory}>{user?.animal_category || '아직 동물이 없어요'}</Text>
-                        <Text style={styles.animalDescription} numberOfLines={2}>
-                            {user?.animal_description || '사전 테스트를 통해 나만의 동물을 확인해보세요.'}
-                        </Text>
-                    </View>
-                    
-                    <View style={styles.progressContainer}>
-                        <AnimatedCircularProgress
-                            size={64}
-                            width={6}
-                            fill={routineRate}
-                            tintColor="#8c7ae6"
-                            backgroundColor="#f1f2f6"
-                            lineCap="round"
-                        >
-                            {() => (
-                                <Text style={styles.progressText}>{routineRate}%</Text>
-                            )}
-                        </AnimatedCircularProgress>
-                    </View>
-                </View>
+          <View style={styles.mainCardContent}>
+            {/* 중앙 동물 캐릭터 */}
+            <View style={styles.animalCenter}>
+              <Text style={styles.animalEmoji}>{user?.animal_emoji || '🌱'}</Text>
             </View>
 
-            {/* 설문조사 메인 버튼 */}
-            {(!currentUserData?.assigned_category && currentUserData?.animal_category !== "조용히 움츠린 거북이") ? (
-                <TouchableOpacity style={styles.primaryButton} activeOpacity={0.8} onPress={() => { navigation.navigate("채팅", { initialMessage: "사전 테스트 시작하기" }); requestSurvey(); }}>
-                    <Text style={styles.primaryButtonText}>마음의 숲 사전 테스트 진행하기</Text>
-                </TouchableOpacity>
-            ) : (
-                <TouchableOpacity style={styles.primaryButton} activeOpacity={0.8} onPress={() => { navigation.navigate("채팅"); startCategorySurvey(); }}>
-                    <Text style={styles.primaryButtonText}>유형별 심화 테스트 진행하기</Text>
-                </TouchableOpacity>
-            )}
+            {/* 정보 및 진행률 행 */}
+            <View style={styles.cardInfoRow}>
+              <View style={styles.cardTextInfo}>
+                <Text style={styles.animalCategory}>{user?.animal_category || '아직 동물이 없어요'}</Text>
+                <Text style={styles.animalDescription} numberOfLines={2}>
+                  {user?.animal_description || '사전 테스트를 통해 나만의 동물을 확인해보세요.'}
+                </Text>
+              </View>
+
+              <View style={styles.progressContainer}>
+                <AnimatedCircularProgress
+                  size={64}
+                  width={6}
+                  fill={routineRate}
+                  tintColor="#8c7ae6"
+                  backgroundColor="#f1f2f6"
+                  lineCap="round"
+                >
+                  {() => (
+                    <Text style={styles.progressText}>{routineRate}%</Text>
+                  )}
+                </AnimatedCircularProgress>
+              </View>
+            </View>
+          </View>
+
+          {/* 설문조사 메인 버튼 */}
+          {(!currentUserData?.assigned_category && currentUserData?.animal_category !== "조용히 움츠린 거북이") ? (
+            <TouchableOpacity style={styles.primaryButton} activeOpacity={0.8} onPress={() => { navigation.navigate("채팅", { initialMessage: "사전 테스트 시작하기" }); }}>
+              <Text style={styles.primaryButtonText}>마음의 숲 사전 테스트 진행하기</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.primaryButton} activeOpacity={0.8} onPress={() => { navigation.navigate("채팅"); startCategorySurvey(); }}>
+              <Text style={styles.primaryButtonText}>유형별 심화 테스트 진행하기</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* 리포트 진입 버튼 */}
         <TouchableOpacity style={styles.reportCard} activeOpacity={0.8} onPress={() => setReportModalVisible(true)}>
-            <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                <View style={styles.reportIconBg}>
-                    <Text style={{fontSize: 24}}>📊</Text>
-                </View>
-                <View>
-                    <Text style={styles.reportTitle}>나의 주간 리포트</Text>
-                    <Text style={styles.reportSubtitle}>이번 주 감정 패턴 분석 보기</Text>
-                </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={styles.reportIconBg}>
+              <Text style={{ fontSize: 24 }}>📊</Text>
             </View>
-            <Text style={{fontSize: 24, color: '#b2bec3', fontWeight: 'bold'}}>›</Text>
+            <View>
+              <Text style={styles.reportTitle}>나의 주간 리포트</Text>
+              <Text style={styles.reportSubtitle}>이번 주 감정 패턴 분석 보기</Text>
+            </View>
+          </View>
+          <Text style={{ fontSize: 24, color: '#b2bec3', fontWeight: 'bold' }}>›</Text>
         </TouchableOpacity>
 
         {/* 오늘의 루틴 영역 */}
         <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>오늘의 루틴</Text>
+          <Text style={styles.sectionTitle}>오늘의 루틴</Text>
         </View>
         <Routines routines={currentUserData?.today_routines} />
 
@@ -394,7 +397,7 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 2,
   },
-  
+
   messageAlert: {
     width: '100%',
     backgroundColor: '#e6e8fa',
@@ -575,7 +578,7 @@ const styles = StyleSheet.create({
     borderColor: '#8c7ae6',
     backgroundColor: '#8c7ae6',
   },
-  
+
   logoutBtn: {
     marginTop: 10,
     padding: 10,
