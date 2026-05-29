@@ -6,6 +6,7 @@ export interface SurveyResult {
     isComplete: boolean;
     result_emoji: string;
     result_name: string;
+    result_description?: string;
 }
 
 interface ResultModalProps {
@@ -37,6 +38,11 @@ const ResultModal = ({ isVisible, data, onClose }: ResultModalProps) => {
                         >
                             {data.result_name || '결과를 불러오는 중...'}
                         </Text>
+                        {data.result_description && (
+                            <Text style={styles.descriptionText}>
+                                {data.result_description}
+                            </Text>
+                        )}
                     </View>
 
                     <TouchableOpacity style={styles.primaryButton} activeOpacity={0.8} onPress={onClose}>
@@ -105,6 +111,15 @@ const styles = StyleSheet.create({
         color: '#2d3436',
         textAlign: 'center',
         fontFamily: 'NanumSquareRoundB',
+    },
+    descriptionText: {
+        fontSize: 14,
+        color: '#636e72',
+        textAlign: 'center',
+        marginTop: 16,
+        lineHeight: 22,
+        fontFamily: 'NanumSquareRoundR',
+        paddingHorizontal: 16,
     },
     primaryButton: {
         backgroundColor: '#8c7ae6',

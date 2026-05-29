@@ -33,8 +33,7 @@ const MOCK_MESSAGES: Message[] = [
 ];
 */
 const MOCK_MESSAGES: Message[] = [
-  { id: '1', text: "상대방 매세지", sender: 'ai', time: '오전 10:00' },
-  { id: '3', text: `{"is_finished": true,"result_emoji": "🐢","result_name": "조용히 숨 고르는 거북이"}`, sender: 'ai', time: '오전 12:00' }
+  { id: '1', text: "상대방 매세지", sender: 'ai', time: '오전 10:00' }
 ];
 
 // 흔하게 발생하는 챗봇의 JSON 생성 오류(마크다운, 잉여 괄호, 오탈자 등)를 복구하여 파싱하는 헬퍼 함수
@@ -83,10 +82,10 @@ const ResultBubble = ({ data, onPress }: { data: any; onPress: () => void }) => 
 //채팅 화면 컴포넌트
 const ChatScreen = () => {
   const isFocused = useIsFocused();//현재 화면이 포커스 되어있는지 확인
-  const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
+  const [messages, setMessages] = useState<Message[]>([]);
   const route: any = useRoute();
   const navigation: any = useNavigation();
-  const lastMessage = messages[messages.length - 1];//마지막 메세지 가져오기
+  const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;//마지막 메세지 가져오기
   const flatListRef = useRef<FlatList<Message> | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState<number>(0);
   const [surveyResult, setSurveyResult] = useState<SurveyResult | null>(null);
@@ -153,13 +152,53 @@ const ChatScreen = () => {
     };
     fetchAnimals();
 
-  }, [route.params?.initialMessage, route.params?.surveyMode]);
+    // 과거 대화 내역 불러오기
+    const fetchChatHistory = async () => {
+      try {
+        // 백엔드 요청 경로 확인 (Swagger 문서에 따라 query parameter로 수정)
+        const url = `${API_BASE_URL}/api/chat-history/api/chat/history?user_id=${user.user_id}`;
+        const response = await fetch(url, {
+          headers: {
+            'ngrok-skip-browser-warning': 'true',
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.messages && data.messages.length > 0) {
+            const historyMessages: Message[] = data.messages.map((msg: any) => ({
+              id: msg.id.toString(),
+              text: msg.content,
+              sender: msg.role === 'user' ? 'user' : 'ai',
+              time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            }));
+            setMessages(prev => {
+              // 기존에 추가된 로컬 메시지(예: 설문조사 시작 메시지)가 있다면 유지하고 과거 내역을 앞에 붙임
+              return [...historyMessages, ...prev];
+            });
+          } else {
+            console.log("과거 대화 내역이 없습니다.");
+          }
+        } else {
+          Alert.alert("채팅 기록 불러오기 오류", `서버 상태 코드: ${response.status}\nURL: ${url}`);
+        }
+      } catch (e: any) {
+        Alert.alert("네트워크 통신 오류", `채팅 서버에 연결할 수 없습니다.\n${e.message}`);
+        console.error("채팅 내역 불러오기 실패:", e);
+      }
+    };
+    if (user?.user_id) {
+      fetchChatHistory();
+    }
+
+  }, [route.params?.initialMessage, route.params?.surveyMode, user?.user_id]);
 
   //백앤드 메세지 요청/응답 함수
   const handleSendMessage = async (inputText: string) => {
     //유저 메세지 보내기
     const userMsg: Message = {
-      id: (MOCK_MESSAGES.length + 1).toString(),
+      id: Date.now().toString() + '_user',
       text: inputText,
       sender: 'user',
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -182,7 +221,7 @@ const ChatScreen = () => {
       }
 
       const aimag: Message = {
-        id: (MOCK_MESSAGES.length + 1).toString(),
+        id: Date.now().toString() + '_ai',
         text: replyText || '응답을 받아오지 못했습니다.', // fallback text
         sender: 'ai',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -195,7 +234,7 @@ const ChatScreen = () => {
   //메세지 보내는 함수(메세지 데이터들에서 추가하는거)
   const sendMessages = (inputText: string) => {
     const newMessage: Message = {
-      id: (messages.length + 1).toString(),
+      id: Date.now().toString() + '_manual',
       text: inputText,
       sender: 'user',
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -284,7 +323,7 @@ const ChatScreen = () => {
 
   //설문데이터인지 판별하는 함수
   const getsurveyData = () => {
-    if (lastMessage.sender !== `ai` || !lastMessage.text) return null;
+    if (!lastMessage || lastMessage.sender !== `ai` || !lastMessage.text) return null;
     try {
       const aiJsonData = parseRobustJSON(lastMessage.text);
       if (aiJsonData && aiJsonData.type === 'select') {
@@ -318,7 +357,7 @@ const ChatScreen = () => {
         )
       } else {
         let isResultData = false;
-        if (lastMessage.sender === 'ai' && lastMessage.text) {
+        if (lastMessage && lastMessage.sender === 'ai' && lastMessage.text) {
           try {
             const parsedData = parseRobustJSON(lastMessage.text);
             if (parsedData && parsedData.is_finished === true) {
@@ -397,12 +436,14 @@ const ChatScreen = () => {
       // 동물 데이터를 기반으로 이모지와 이름 매핑
       let finalEmoji = surveyData.result_emoji;
       let finalName = surveyData.result_name;
+      let finalDescription = surveyData.result_description;
 
       if (surveyData.category && animalList.length > 0) {
         const matchedAnimal = animalList.find(a => a.category === surveyData.category);
         if (matchedAnimal) {
           finalEmoji = matchedAnimal.emoji;
           finalName = matchedAnimal.name;
+          finalDescription = matchedAnimal.description;
         }
       }
 
@@ -410,6 +451,7 @@ const ChatScreen = () => {
         ...surveyData,
         result_emoji: finalEmoji || '🌱',
         result_name: finalName || '결과를 분석 중입니다...',
+        result_description: finalDescription,
       };
 
       return (
