@@ -1,5 +1,8 @@
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, Dimensions, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { useMainContext } from './MainContext';
+import { API_BASE_URL } from './config';
 
 //결과 데이터 구조
 export interface SurveyResult {
@@ -18,6 +21,42 @@ interface ResultModalProps {
 const { width } = Dimensions.get('window');
 
 const ResultModal = ({ isVisible, data, onClose }: ResultModalProps) => {
+    const navigation = useNavigation<any>();
+    const { user } = useMainContext();
+
+    const startCategorySurvey = async () => {
+        let surveyType = user?.assigned_category;
+        const animalName = data?.result_name || user?.animal_category;
+
+        if (animalName === "조용히 숨 고르는 거북이" || animalName === "조용히 움츠린 거북이") {
+            surveyType = "DEPRESSION";
+        }
+
+        if (!surveyType) {
+            Alert.alert("알림", "아직 진행할 수 있는 유형 설문조사가 없습니다.");
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/survey/${surveyType}`);
+            if (!response.ok) {
+                Alert.alert('설문 문항 불러오기 실패', '서버 오류');
+                return;
+            }
+
+            const surveyData = await response.json();
+            if (surveyData && surveyData.length > 0) {
+                onClose();
+                navigation.navigate("채팅", { surveyMode: true, surveyQuestions: surveyData, surveyType: surveyType });
+            } else {
+                Alert.alert('알림', '가져올 설문 문항이 없습니다.');
+            }
+        } catch (error) {
+            console.error('설문 문항 불러오기 실패:', error);
+            Alert.alert('오류', '네트워크 연결을 확인해주세요.');
+        }
+    };
+
     if (!data) return null;
     return (
         <Modal transparent={true} visible={isVisible} animationType='fade' onRequestClose={onClose}>
@@ -45,8 +84,8 @@ const ResultModal = ({ isVisible, data, onClose }: ResultModalProps) => {
                         )}
                     </View>
 
-                    <TouchableOpacity style={styles.primaryButton} activeOpacity={0.8} onPress={onClose}>
-                        <Text style={styles.primaryButtonText}>결과 확인하기</Text>
+                    <TouchableOpacity style={styles.primaryButton} activeOpacity={0.8} onPress={startCategorySurvey}>
+                        <Text style={styles.primaryButtonText}>심화 테스트 진행하기</Text>
                     </TouchableOpacity>
                 </View>
             </TouchableOpacity>
