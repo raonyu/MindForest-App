@@ -10,6 +10,7 @@ export interface SurveyResult {
     result_emoji: string;
     result_name: string;
     result_description?: string;
+    category?: string;
 }
 
 interface ResultModalProps {
@@ -25,10 +26,10 @@ const ResultModal = ({ isVisible, data, onClose }: ResultModalProps) => {
     const { user } = useMainContext();
 
     const startCategorySurvey = async () => {
-        let surveyType = user?.assigned_category;
+        let surveyType = data?.category || user?.assigned_category;
         const animalName = data?.result_name || user?.animal_category;
 
-        if (animalName === "조용히 숨 고르는 거북이" || animalName === "조용히 움츠린 거북이") {
+        if (!surveyType && (animalName === "조용히 숨 고르는 거북이" || animalName === "조용히 움츠린 거북이")) {
             surveyType = "DEPRESSION";
         }
 

@@ -93,6 +93,29 @@ const ChatScreen = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const { user } = useMainContext();
 
+  // 페이징 (스크롤 긴 현상 방지)
+  const [maxMessages, setMaxMessages] = useState(15);
+  const prevMsgLength = useRef(0);
+
+  useEffect(() => {
+    const diff = messages.length - prevMsgLength.current;
+    if (diff > 0 && prevMsgLength.current > 0) {
+      if (diff < 10) { 
+        setMaxMessages(prev => prev + diff);
+      }
+    }
+    prevMsgLength.current = messages.length;
+  }, [messages.length]);
+
+  const handleScroll = (event: any) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    if (offsetY <= 100 && maxMessages < messages.length) {
+      setMaxMessages(prev => Math.min(prev + 15, messages.length));
+    }
+  };
+
+  const displayedMessages = messages.slice(Math.max(0, messages.length - maxMessages));
+
   // 설문조사 모드 관련 상태
   const [surveyMode, setSurveyMode] = useState(false);
   const [surveyQuestions, setSurveyQuestions] = useState<any[]>([]);
@@ -506,13 +529,15 @@ const ChatScreen = () => {
     <View style={styles.container}>
       <Text style={styles.screenTitle}>채팅 화면</Text>
       <FlatList<Message>
-        data={messages}
+        data={displayedMessages}
         renderItem={renderMessages}
         keyExtractor={item => item.id}
         style={styles.list}
         contentContainerStyle={[styles.listContent, { paddingBottom: 24 + keyboardHeight }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         ref={(ref) => { /* @ts-ignore */ flatListRef.current = ref }}
       />
       <ResultModal isVisible={modalVisible} data={surveyResult} onClose={() => setModalVisible(false)} />

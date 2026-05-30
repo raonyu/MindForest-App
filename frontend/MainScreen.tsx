@@ -1,7 +1,7 @@
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { useMainContext } from './MainContext';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Alert, View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { StyleSheet, Alert, View, Text, TouchableOpacity, ScrollView, Modal } from 'react-native';
 import ReportModal, { ReportResult } from './ReportModal';
 import { useBottomBar } from './BottomBarContext';
 import { API_BASE_URL } from './config';
@@ -169,6 +169,23 @@ const MainScreen = () => {
   const [currentUserData, setCurrentUserData] = useState<currentData | null>(null);
   const [emotionMessage, setEmotionMessage] = useState<emotionData | null>(null);
   const [reportData, setReportData] = useState<any>(null);
+  const [testListModalVisible, setTestListModalVisible] = useState(false);
+  const [animalList, setAnimalList] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchAnimals = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/animal/all`);
+        if (response.ok) {
+          const data = await response.json();
+          setAnimalList(data);
+        }
+      } catch (e) {
+        console.error("동물 데이터 불러오기 실패:", e);
+      }
+    };
+    fetchAnimals();
+  }, []);
 
   const requestSurvey = async () => {
     try {
@@ -189,9 +206,9 @@ const MainScreen = () => {
     }
   };
 
-  const startCategorySurvey = async () => {
-    let surveyType = currentUserData?.assigned_category;
-    if (currentUserData?.animal_category === "조용히 움츠린 거북이") {
+  const startCategorySurvey = async (selectedType?: string) => {
+    let surveyType = selectedType || currentUserData?.assigned_category;
+    if (!selectedType && currentUserData?.animal_category === "조용히 움츠린 거북이") {
       surveyType = "DEPRESSION";
     }
 
@@ -262,6 +279,39 @@ const MainScreen = () => {
     <View style={{ flex: 1, backgroundColor: '#F4F5F9' }}>
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <ReportModal isVisible={reportModalVisible} data={reportData ?? null} onClose={() => setReportModalVisible(false)} />
+        <Modal
+          visible={testListModalVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setTestListModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>어떤 테스트를 진행해볼까요?</Text>
+              <ScrollView style={{ maxHeight: 400 }}>
+                {animalList.map((animal, index) => (
+                  <TouchableOpacity 
+                    key={index} 
+                    style={styles.animalListItem}
+                    onPress={() => {
+                      setTestListModalVisible(false);
+                      startCategorySurvey(animal.category);
+                    }}
+                  >
+                    <Text style={styles.animalListEmoji}>{animal.emoji}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.animalListName}>{animal.name}</Text>
+                      <Text style={styles.animalListDesc}>{animal.description}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <TouchableOpacity style={styles.modalCloseButton} onPress={() => setTestListModalVisible(false)}>
+                <Text style={styles.modalCloseButtonText}>닫기</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
 
         {/* 헤더 영역 */}
         <View style={styles.header}>
@@ -276,8 +326,16 @@ const MainScreen = () => {
 
         {/* 감정 메시지 알림바 */}
         {emotionMessage?.message && (
-          <View style={styles.messageAlert}>
-            <Text style={styles.messageText}>💡 {user?.diagnosis_result?.result_message || emotionMessage?.message}</Text>
+          <View style={[styles.messageAlert, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+            <Text style={[styles.messageText, { flex: 1 }]}>💡 {user?.diagnosis_result?.result_message || emotionMessage?.message}</Text>
+            {currentUserData?.diagnosis_result?.total_score !== undefined && currentUserData.diagnosis_result.total_score <= 4 && (
+              <TouchableOpacity 
+                style={styles.otherTestButton}
+                onPress={() => setTestListModalVisible(true)}
+              >
+                <Text style={styles.otherTestButtonText}>다른 테스트 진행하기</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -321,9 +379,14 @@ const MainScreen = () => {
               <Text style={styles.primaryButtonText}>마음의 숲 사전 테스트 진행하기</Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity style={styles.primaryButton} activeOpacity={0.8} onPress={() => { navigation.navigate("채팅"); startCategorySurvey(); }}>
-              <Text style={styles.primaryButtonText}>유형별 심화 테스트 진행하기</Text>
-            </TouchableOpacity>
+            <View style={{ width: '100%', alignItems: 'center' }}>
+              <TouchableOpacity style={styles.primaryButton} activeOpacity={0.8} onPress={() => { navigation.navigate("채팅"); startCategorySurvey(); }}>
+                <Text style={styles.primaryButtonText}>유형별 심화 테스트 진행하기</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.secondarySmallButton} activeOpacity={0.8} onPress={() => { navigation.navigate("채팅", { initialMessage: "사전 테스트 시작하기" }); }}>
+                <Text style={styles.secondarySmallButtonText}>사전 테스트 다시 진행하기</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
 
@@ -587,6 +650,85 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#b2bec3',
     textDecorationLine: 'underline',
+  },
+  otherTestButton: {
+    marginLeft: 12,
+    backgroundColor: '#8c7ae6',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  otherTestButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: 'bold',
+    fontFamily: 'NanumSquareRoundB',
+  },
+  secondarySmallButton: {
+    marginTop: 10,
+    padding: 10,
+  },
+  secondarySmallButtonText: {
+    fontSize: 14,
+    color: '#b2bec3',
+    textDecorationLine: 'underline',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '85%',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    fontFamily: 'NanumSquareRoundB',
+    color: '#2d3436',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  animalListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f2f6',
+  },
+  animalListEmoji: {
+    fontSize: 32,
+    marginRight: 12,
+  },
+  animalListName: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    fontFamily: 'NanumSquareRoundB',
+    color: '#2d3436',
+    marginBottom: 4,
+  },
+  animalListDesc: {
+    fontSize: 12,
+    color: '#636e72',
+    fontFamily: 'NanumSquareRoundR',
+  },
+  modalCloseButton: {
+    marginTop: 16,
+    backgroundColor: '#f1f2f6',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  modalCloseButtonText: {
+    color: '#636e72',
+    fontSize: 14,
+    fontWeight: 'bold',
+    fontFamily: 'NanumSquareRoundB',
   },
 });
 
