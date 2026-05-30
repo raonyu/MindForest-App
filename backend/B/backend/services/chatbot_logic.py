@@ -1,5 +1,4 @@
 import os
-import json
 from openai import OpenAI
 from dotenv import load_dotenv
 from datetime import datetime
@@ -32,6 +31,219 @@ ONBOARDING_QUESTIONS = [
     {"title": "20. 마음의 숲에서 내가 찾고 싶은 장소는 어디일까?", "detail": ["안전한 오두막", "정돈된 깔끔한 정원", "모험이 가득한 숲"]}
 ]
 
+CATEGORIES = [
+    "DEPRESSION",
+    "BIPOLAR",
+    "ANXIETY",
+    "SCHIZOPHRENIA",
+    "PTSD",
+    "OCD",
+    "ADHD",
+    "EATING_DISORDER",
+    "ANGER",
+]
+
+ONBOARDING_SCORE_MAP = [
+    [
+        {"DEPRESSION": 2, "ANXIETY": 1},
+        {"OCD": 2, "ANXIETY": 1},
+        {"ADHD": 2, "BIPOLAR": 1},
+    ],
+    [
+        {"BIPOLAR": 2, "ANXIETY": 1},
+        {"ANXIETY": 2, "PTSD": 1},
+        {"ANGER": 2, "BIPOLAR": 1},
+    ],
+    [
+        {"DEPRESSION": 2, "PTSD": 1},
+        {"OCD": 2, "ANXIETY": 1},
+        {"ANGER": 2, "ADHD": 1},
+    ],
+    [
+        {"PTSD": 2, "DEPRESSION": 1},
+        {"OCD": 2, "EATING_DISORDER": 1},
+        {"ADHD": 2, "BIPOLAR": 1},
+    ],
+    [
+        {"DEPRESSION": 2, "EATING_DISORDER": 1},
+        {"BIPOLAR": 2, "ADHD": 1},
+        {"PTSD": 2, "ANXIETY": 1},
+    ],
+    [
+        {"ANXIETY": 2, "PTSD": 1},
+        {"ANGER": 2, "BIPOLAR": 1},
+        {"DEPRESSION": 2, "EATING_DISORDER": 1},
+    ],
+    [
+        {"DEPRESSION": 2, "ANXIETY": 1},
+        {"ANXIETY": 2, "SCHIZOPHRENIA": 1},
+        {"BIPOLAR": 2, "ADHD": 1},
+    ],
+    [
+        {"SCHIZOPHRENIA": 2, "ANXIETY": 1},
+        {"EATING_DISORDER": 2, "OCD": 1},
+        {"BIPOLAR": 2, "ADHD": 1},
+    ],
+    [
+        {"PTSD": 2, "SCHIZOPHRENIA": 1},
+        {"BIPOLAR": 2, "ADHD": 1},
+        {"ANXIETY": 2, "OCD": 1},
+    ],
+    [
+        {"ADHD": 2, "DEPRESSION": 1},
+        {"EATING_DISORDER": 2, "DEPRESSION": 1},
+        {"SCHIZOPHRENIA": 2, "ANXIETY": 1},
+    ],
+    [
+        {"ANXIETY": 2, "PTSD": 1},
+        {"OCD": 2, "ANXIETY": 1},
+        {"ADHD": 2, "BIPOLAR": 1},
+    ],
+    [
+        {"OCD": 2, "ANXIETY": 1},
+        {"ANGER": 2, "BIPOLAR": 1},
+        {"DEPRESSION": 2, "ADHD": 1},
+    ],
+    [
+        {"ANGER": 2, "OCD": 1},
+        {"PTSD": 2, "ANXIETY": 1},
+        {"ADHD": 2, "BIPOLAR": 1},
+    ],
+    [
+        {"ANXIETY": 2, "DEPRESSION": 1},
+        {"OCD": 2, "EATING_DISORDER": 1},
+        {"ADHD": 2, "BIPOLAR": 1},
+    ],
+    [
+        {"PTSD": 2, "DEPRESSION": 1},
+        {"ANXIETY": 2, "SCHIZOPHRENIA": 1},
+        {"BIPOLAR": 2, "ANGER": 1},
+    ],
+    [
+        {"SCHIZOPHRENIA": 2, "ANXIETY": 1},
+        {"PTSD": 2, "DEPRESSION": 1},
+        {"BIPOLAR": 2, "ANGER": 1},
+    ],
+    [
+        {"ANGER": 2, "BIPOLAR": 1},
+        {"SCHIZOPHRENIA": 2, "PTSD": 1},
+        {"EATING_DISORDER": 2, "ADHD": 1},
+    ],
+    [
+        {"DEPRESSION": 2, "ANXIETY": 1},
+        {"SCHIZOPHRENIA": 2, "PTSD": 1},
+        {"ADHD": 2, "BIPOLAR": 1},
+    ],
+    [
+        {"EATING_DISORDER": 2, "OCD": 1},
+        {"DEPRESSION": 2, "EATING_DISORDER": 1},
+        {"PTSD": 2, "SCHIZOPHRENIA": 1},
+    ],
+    [
+        {"PTSD": 2, "ANXIETY": 1},
+        {"OCD": 2, "EATING_DISORDER": 1},
+        {"ADHD": 2, "BIPOLAR": 1},
+    ],
+]
+
+CATEGORY_REASON_LABELS = {
+    "DEPRESSION": "지친 마음을 조용히 쉬게 하고 싶은 신호가 많이 보여요.",
+    "BIPOLAR": "감정의 움직임이 크고 순간의 에너지가 선명하게 드러나요.",
+    "ANXIETY": "불확실한 상황에서 긴장과 걱정이 먼저 올라오는 편이에요.",
+    "SCHIZOPHRENIA": "혼자만의 안전한 세계와 섬세한 거리감이 중요해 보여요.",
+    "PTSD": "상처받지 않기 위해 스스로를 보호하려는 마음이 강하게 보여요.",
+    "OCD": "정돈감과 예측 가능한 흐름에서 안정감을 찾는 편이에요.",
+    "ADHD": "새로운 자극과 빠른 전환에 민감하게 반응하는 에너지가 있어요.",
+    "EATING_DISORDER": "허전함을 채우고 스스로를 다독이고 싶은 마음이 보여요.",
+    "ANGER": "답답함이나 침범당한 느낌에 빠르게 반응하는 경향이 보여요.",
+}
+
+ANSWER_TO_INDEX = {
+    option: option_idx
+    for question in ONBOARDING_QUESTIONS
+    for option_idx, option in enumerate(question["detail"])
+}
+
+
+def _extract_onboarding_answers(chat_history, current_message=None):
+    valid_answers = set(ANSWER_TO_INDEX.keys())
+    answers = [
+        str(h.get("content", "")).strip()
+        for h in chat_history
+        if h.get("role") == "user" and str(h.get("content", "")).strip() in valid_answers
+    ]
+
+    current = str(current_message or "").strip()
+    if current in valid_answers:
+        answers.append(current)
+
+    return answers[:len(ONBOARDING_QUESTIONS)]
+
+
+def _calculate_max_scores():
+    max_scores = {category: 0 for category in CATEGORIES}
+    for question_scores in ONBOARDING_SCORE_MAP:
+        for category in CATEGORIES:
+            max_scores[category] += max(option_scores.get(category, 0) for option_scores in question_scores)
+    return max_scores
+
+
+MAX_POSSIBLE_SCORES = _calculate_max_scores()
+
+
+def analyze_onboarding_answers(answers):
+    scores = {category: 0 for category in CATEGORIES}
+    primary_hits = {category: 0 for category in CATEGORIES}
+
+    for question_idx, answer in enumerate(answers[:len(ONBOARDING_QUESTIONS)]):
+        options = ONBOARDING_QUESTIONS[question_idx]["detail"]
+        if answer not in options:
+            continue
+
+        option_idx = options.index(answer)
+        option_scores = ONBOARDING_SCORE_MAP[question_idx][option_idx]
+        for category, point in option_scores.items():
+            scores[category] += point
+            if point == 2:
+                primary_hits[category] += 1
+
+    normalized_scores = {
+        category: scores[category] / MAX_POSSIBLE_SCORES[category]
+        if MAX_POSSIBLE_SCORES[category] else 0
+        for category in CATEGORIES
+    }
+
+    selected_category = max(
+        CATEGORIES,
+        key=lambda category: (
+            normalized_scores[category],
+            scores[category],
+            primary_hits[category],
+        ),
+    )
+
+    sorted_categories = sorted(
+        CATEGORIES,
+        key=lambda category: normalized_scores[category],
+        reverse=True,
+    )
+    second_category = sorted_categories[1] if len(sorted_categories) > 1 else selected_category
+
+    return {
+        "is_finished": True,
+        "category": selected_category,
+        "reason": (
+            f"{CATEGORY_REASON_LABELS[selected_category]} "
+            f"또한 {CATEGORY_REASON_LABELS[second_category]}"
+        ),
+        "scores": scores,
+        "ratios": {
+            category: round(normalized_scores[category] * 100, 1)
+            for category in CATEGORIES
+        },
+    }
+
+
 def get_chat_response(user_message, chat_history=None, is_onboarding_done=False, user_animal="", signup_date=None):
     """
     마음의 숲 챗봇 엔진
@@ -44,8 +256,8 @@ def get_chat_response(user_message, chat_history=None, is_onboarding_done=False,
 
     # [1] 온보딩 모드 (20문항 테스트 진행 중)
     if not is_onboarding_done:
-        # 사용자가 보낸 답변들만 추출해서 현재 몇 번째 질문을 내보낼지 계산
-        user_answers = [h for h in chat_history if h['role'] == 'user']
+        # 실제 선택지로 들어온 답변만 추출해서 시작 메시지를 답변으로 세지 않게 합니다.
+        user_answers = _extract_onboarding_answers(chat_history, user_message)
         q_idx = len(user_answers)
 
         # 아직 20문항을 다 완료하지 않은 경우: 질문 리스트에서 다음 질문을 반환
@@ -58,38 +270,9 @@ def get_chat_response(user_message, chat_history=None, is_onboarding_done=False,
                 "is_finished": False
             }
         
-        # 20문항 답변이 모두 완료된 경우: GPT가 카테고리를 분석
+        # 20문항 답변이 모두 완료된 경우: 고정 점수표와 기회 대비 비율로 카테고리 분석
         else:
-            system_prompt = """
-            너는 심리 분석 전문가야. 사용자의 20가지 답변을 토대로 9가지 질환 카테고리 중 가장 적합한 하나를 골라줘.
-            반드시 아래 JSON 형식으로만 응답해.
-            
-            [대상 카테고리]
-            DEPRESSION, BIPOLAR, ANXIETY, SCHIZOPHRENIA, PTSD, OCD, ADHD, EATING_DISORDER, ANGER
-            
-            [출력 JSON 포맷]
-            {
-              "is_finished": true,
-              "category": "선택한 영문 카테고리명",
-              "reason": "해당 동물을 추천하는 따뜻한 분석 이유 (2문장 내외)"
-            }
-            """
-            try:
-                response = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role": "system", "content": system_prompt}] + chat_history,
-                    temperature=0.3,
-                    response_format={"type": "json_object"}
-                )
-                return json.loads(response.choices[0].message.content.strip())
-            except Exception as e:
-                print(f"AI 분석 에러: {e}")
-                # 에러 시 기본값 (DB에 존재하는 카테고리여야 함)
-                return {
-                    "is_finished": True,
-                    "category": "DEPRESSION",
-                    "reason": "마음이 조금 지쳐 보여 조용히 쉴 수 있는 거북이 숲으로 안내해 드릴게요."
-                }
+            return analyze_onboarding_answers(user_answers)
 
     # [2] 상담 모드 (온보딩 완료 후 일반 상담)
     else:
