@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from database import get_db
 import models
 from routine_manager import routine_manager
@@ -46,5 +47,19 @@ def complete_routine(user_routine_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="루틴을 찾을 수 없습니다.")
     
     routine.is_completed = True
+    
+    # [동기화] 오늘 작성된 일기(Diary)가 있다면, 일기 테이블 내 루틴 완료 관련 필드도 자동으로 동기화합니다.
+    today_date = routine.date
+    existing_diary = db.query(models.Diary).filter(
+        models.Diary.user_id == routine.user_id,
+        func.date(models.Diary.created_at) == today_date
+    ).first()
+    
+    if existing_diary:
+        existing_diary.routine_name = routine.routine_detail.content if routine.routine_detail else None
+        existing_diary.routine_category = routine.routine_detail.category if routine.routine_detail else None
+        existing_diary.is_done = True
+        existing_diary.score_diff = 10.0
+
     db.commit()
     return {"message": "routine completed!"}

@@ -43,21 +43,25 @@ def update_routine_status(data: RoutineRequest, db: Session = Depends(get_db)):
         target_date = datetime.now().date()
         
         routine_category = "활동형"
-        for cat, levels in routine_manager.ROUTINE_MASTER.items():
-            for level, routines in levels.items():
-                if data.routine_name in routines:
-                    routine_category = cat
-                    break
+        # [수정] DB의 RoutineMaster 테이블을 조회하여 실제 등록된 카테고리를 실시간으로 획득합니다.
+        master_routine = db.query(models.RoutineMaster).filter(
+            models.RoutineMaster.content == data.routine_name
+        ).first()
+        if master_routine:
+            routine_category = master_routine.category
 
         existing_diary = db.query(models.Diary).filter(
             models.Diary.user_id == data.user_id,
             func.date(models.Diary.created_at) == target_date
         ).first()
 
+        score_diff_val = 10.0 if data.is_done else 0.0
+
         if existing_diary:
             existing_diary.routine_name = data.routine_name
             existing_diary.routine_category = routine_category
             existing_diary.is_done = data.is_done
+            existing_diary.score_diff = score_diff_val
         else:
             new_diary = models.Diary(
                 user_id=data.user_id,
@@ -65,9 +69,19 @@ def update_routine_status(data: RoutineRequest, db: Session = Depends(get_db)):
                 routine_name=data.routine_name,
                 routine_category=routine_category,
                 is_done=data.is_done,
+                score_diff=score_diff_val,
                 created_at=datetime.combine(target_date, datetime.now().time())
             )
             db.add(new_diary)
+
+        # [동기화] user_routines 테이블 상태도 동일하게 업데이트하여 완벽하게 연계되도록 함
+        user_routine = db.query(models.UserRoutine).join(models.RoutineMaster).filter(
+            models.UserRoutine.user_id == data.user_id,
+            models.UserRoutine.date == target_date,
+            models.RoutineMaster.content == data.routine_name
+        ).first()
+        if user_routine:
+            user_routine.is_completed = data.is_done
 
         db.commit()
         return {"status": "success"}
@@ -112,6 +126,7 @@ def create_or_update_diary(data: DiaryRequest, db: Session = Depends(get_db)):
             raise HTTPException(status_code=500, detail="AI 분석 실패")
 
         emotions = analysis.get("emotions", {})
+        analysis_comment = analysis.get("analysis_comment", "")
 
         # 3. 데이터베이스에 넣기 (Upsert)
         existing_diary = db.query(models.Diary).filter(
@@ -119,14 +134,35 @@ def create_or_update_diary(data: DiaryRequest, db: Session = Depends(get_db)):
             func.date(models.Diary.created_at) == target_date
         ).first()
 
+        # [자동 동기화] 오늘 완료한 루틴이 있다면 가져와서 세팅합니다.
+        completed_routine = db.query(models.UserRoutine).filter(
+            models.UserRoutine.user_id == data.user_id,
+            models.UserRoutine.date == target_date,
+            models.UserRoutine.is_completed == True
+        ).first()
+        
+        # 클라이언트(프론트엔드)에서 루틴 전송이 누락된 경우 DB에 저장된 완료 상태를 기반으로 필드 자동 구성
+        default_routine_name = completed_routine.routine_detail.content if (completed_routine and completed_routine.routine_detail) else None
+        default_routine_category = completed_routine.routine_detail.category if (completed_routine and completed_routine.routine_detail) else None
+        default_is_done = True if completed_routine else False
+        default_score_diff = 10.0 if completed_routine else 0.0
+
+        routine_name = data.routine_name or default_routine_name
+        routine_category = data.routine_category or default_routine_category
+        is_done = data.is_done or default_is_done
+        score_diff = data.score_diff if data.score_diff > 0 else default_score_diff
+
         if existing_diary:
             # 기존 일기가 있으면 덮어쓰기 (Update)
             existing_diary.content = packaged_content
             existing_diary.emotion = data.emotion or existing_diary.emotion
-            existing_diary.routine_name = data.routine_name or existing_diary.routine_name
-            existing_diary.routine_category = data.routine_category or existing_diary.routine_category
-            existing_diary.score_diff = data.score_diff
-            existing_diary.is_done = data.is_done
+            
+            # 자동 동기화 데이터 및 클라이언트 전송 데이터 융합 적용
+            existing_diary.routine_name = routine_name
+            existing_diary.routine_category = routine_category
+            existing_diary.score_diff = score_diff
+            existing_diary.is_done = is_done
+            existing_diary.analysis_comment = analysis_comment
             
             # 8가지 감정 점수 매핑 업데이트
             for k, v in emotions.items():
@@ -138,10 +174,11 @@ def create_or_update_diary(data: DiaryRequest, db: Session = Depends(get_db)):
                 user_id=data.user_id,
                 content=packaged_content,
                 emotion=data.emotion,
-                routine_name=data.routine_name,
-                routine_category=data.routine_category,
-                score_diff=data.score_diff,
-                is_done=data.is_done,
+                routine_name=routine_name,
+                routine_category=routine_category,
+                score_diff=score_diff,
+                is_done=is_done,
+                analysis_comment=analysis_comment,
                 created_at=datetime.combine(target_date, datetime.now().time()),
                 **emotions
             )
@@ -155,7 +192,7 @@ def create_or_update_diary(data: DiaryRequest, db: Session = Depends(get_db)):
             diary_id=new_diary.id,
             emotion=main_emotion,
             score=emotions.get(main_emotion, 0.0),
-            feedback="" 
+            feedback=analysis_comment 
         )
         db.add(new_analysis)
 

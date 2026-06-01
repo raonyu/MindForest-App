@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
 import models
-# [수정] C의 실제 파일인 routine_manager를 임포트합니다.
+import datetime
+# [수정] C의 실제 파일인 routine_manager와 analysis_C 분석 함수를 임포트합니다.
 import routine_manager 
+from analysis_C import get_mind_forest_report
 from services.emotion_service import get_recent_emotions
 from services.ai_logic import check_anomaly_level
 
@@ -73,23 +75,29 @@ def get_report(user_id: str, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
     
-    # 1. C의 분석 함수(analyze_routine_logs)를 위한 데이터 가공
-    # DB에 저장된 user.diaries 데이터를 C가 요구하는 딕셔너리 리스트 형태로 변환합니다.
-    logs = [
-        {
-            "category": d.routine_category,
-            "score_diff": d.score_diff if d.score_diff else 0.0,
-            "is_completed": d.is_done
+    # 1. C의 분석 엔진(get_mind_forest_report) 호출
+    try:
+        report_res = get_mind_forest_report(db, user_id)
+        if "error" in report_res:
+            # 일기가 없는 등의 예외 케이스 기본값 처리
+            report_res = {
+                "status": "no_data",
+                "message": "아직 주간 리포트를 분석하기에 일기 데이터가 충분하지 않습니다."
+            }
+    except Exception as e:
+        print(f"🚨 리포트 분석 엔진 구동 실패: {e}")
+        report_res = {
+            "status": "no_data",
+            "message": f"리포트 생성 실패: {str(e)}"
         }
-        for d in user.diaries
-    ]
     
-    # C의 분석 로직 호출
-    report_res = routine_manager.analyze_routine_logs(logs)
-    
-    # 2. C의 추천 로직(get_recommended_routines) 호출
-    # user 객체를 통째로 넘기면 C의 함수가 내부에서 가입일과 일기 목록을 분석합니다.
-    recommendations = routine_manager.get_recommended_routines(user)
+    # 2. 오늘 유저에게 할당된 추천 루틴 조회
+    today = datetime.date.today()
+    routines = db.query(models.UserRoutine).filter(
+        models.UserRoutine.user_id == user_id,
+        models.UserRoutine.date == today
+    ).all()
+    recommendations = [r.routine_detail.content for r in routines if r.routine_detail]
     
     # 3. 가입일 확인 (요구사항 2: signup_date)
     signup_date = user.created_at
@@ -99,6 +107,6 @@ def get_report(user_id: str, db: Session = Depends(get_db)):
         "user_animal": user.user_animal,
         "assigned_category": user.assigned_category,
         "signup_date": signup_date,
-        "weekly_analysis": report_res,   # C의 analyze_routine_logs 결과
-        "recommendations": recommendations # C의 get_recommended_routines 결과
+        "weekly_analysis": report_res,
+        "recommendations": recommendations
     }
