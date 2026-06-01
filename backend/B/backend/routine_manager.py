@@ -53,4 +53,29 @@ class RoutineManager:
             models.UserRoutine.date == date.today()
         ).all()
 
+    def get_recommended_routines(self, user_data_or_user):
+        """
+        C 파트 및 B 파트 분석의 백워드 호환성을 위한 루틴 추천 래퍼 함수입니다.
+        """
+        return ["햇볕 쬐며 10분 산책하기", "작은 성취 기록하기: '물 마시기', '이불 개기' 등 아주 사소한 일을 완료하고 체크합니다.", "감사 세 줄 일기: 뇌가 긍정적인 정보에 주목을 받도록 훈련합니다."]
+
+    def analyze_routine_logs(self, logs: list):
+        """
+        루틴 수행 이력을 분석하여 결과를 반환합니다.
+        """
+        completed = sum(1 for l in logs if l.get("is_completed"))
+        total = len(logs)
+        return {
+            "total_completed": completed,
+            "total_assigned": total,
+            "status": "success"
+        }
+
 routine_manager = RoutineManager()
+
+# 모듈 단위 함수 노출 (main_C.py 임포트용)
+def get_recommended_routines(user_data_or_user):
+    return routine_manager.get_recommended_routines(user_data_or_user)
+
+def analyze_routine_logs(logs):
+    return routine_manager.analyze_routine_logs(logs)
