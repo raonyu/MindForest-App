@@ -97,6 +97,13 @@ const ChatScreen = () => {
   const [maxMessages, setMaxMessages] = useState(15);
   const prevMsgLength = useRef(0);
 
+  // 화면이 다시 포커스될 때 렌더링 메시지 수를 초기화하여 렉을 방지합니다.
+  useEffect(() => {
+    if (isFocused) {
+      setMaxMessages(15);
+    }
+  }, [isFocused]);
+
   useEffect(() => {
     const diff = messages.length - prevMsgLength.current;
     if (diff > 0 && prevMsgLength.current > 0) {

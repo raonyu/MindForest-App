@@ -17,7 +17,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import LinearGradient from 'react-native-linear-gradient';
 // import {LinearGradient} from 'expo-linear-gradient';
 
-
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Svg, { Defs, Pattern, Rect, Path as SvgPath } from 'react-native-svg';
 
 //각 화면 컴포넌트 불러오기
@@ -187,19 +188,23 @@ function App() {
   }
 
   return (
-    <MainContext.Provider value={{ user, setUser, handleLogOut }}>
-      <NavigationContainer>
-        <Stack.Navigator>
-          {user ? (
-            <>
-              <Stack.Screen name="메인서비스" component={ServiceScreen} options={{ headerShown: false }} />
-            </>
-          ) : (
-            <Stack.Screen name="로그인" options={{ headerShown: false }}>{(props: any) => <LoginScreen {...props} onLoginSuccess={handleLogin} />}</Stack.Screen>
-          )}
-        </Stack.Navigator>
-      </NavigationContainer>
-    </MainContext.Provider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <MainContext.Provider value={{ user, setUser, handleLogOut }}>
+        <NavigationContainer>
+          <Stack.Navigator>
+            {user ? (
+              <>
+                <Stack.Screen name="메인서비스" component={ServiceScreen} options={{ headerShown: false }} />
+              </>
+            ) : (
+              <Stack.Screen name="로그인" options={{ headerShown: false }}>{(props: any) => <LoginScreen {...props} onLoginSuccess={handleLogin} />}</Stack.Screen>
+            )}
+          </Stack.Navigator>
+        </NavigationContainer>
+        </MainContext.Provider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 };
 

@@ -383,9 +383,6 @@ const MainScreen = () => {
               <TouchableOpacity style={styles.primaryButton} activeOpacity={0.8} onPress={() => { navigation.navigate("채팅"); startCategorySurvey(); }}>
                 <Text style={styles.primaryButtonText}>유형별 심화 테스트 진행하기</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.secondarySmallButton} activeOpacity={0.8} onPress={() => { navigation.navigate("채팅", { initialMessage: "사전 테스트 시작하기" }); }}>
-                <Text style={styles.secondarySmallButtonText}>사전 테스트 다시 진행하기</Text>
-              </TouchableOpacity>
             </View>
           )}
         </View>
