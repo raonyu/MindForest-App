@@ -34,15 +34,19 @@ class Diary(Base):
 
     # 루틴 데이터
     routine_name = Column(String, nullable=True)
-    
-    # [요구사항 1] 신규 필드 추가
     routine_category = Column(String, nullable=True)
     score_diff = Column(Float, default=0.0)
-
     is_done = Column(Boolean, default=False)
-    emotion = Column(String, nullable=True)
 
-    # 8가지 감정 수치
+    # 사용자 Self-Report - 첫 번째 감정
+    emotion = Column(String, nullable=True)
+    emotion_intensity = Column(Integer, nullable=True)
+
+    # 사용자 Self-Report - 두 번째 감정
+    secondary_emotion = Column(String, nullable=True)
+    secondary_emotion_intensity = Column(Integer, nullable=True)
+
+    # AI 8가지 감정 수치
     joy = Column(Float, default=0.0)
     sadness = Column(Float, default=0.0)
     anger = Column(Float, default=0.0)
@@ -52,12 +56,28 @@ class Diary(Base):
     surprise = Column(Float, default=0.0)
     anticipation = Column(Float, default=0.0)
 
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.datetime.now(datetime.timezone.utc))
-    analysis_comment = Column(String)
-    
-    author = relationship("User", back_populates="diaries")
-    analysis_data = relationship("Analysis", back_populates="diary", uselist=False)
+    # AI 감정 분석 상태
+    analysis_status = Column(String, default="idle", nullable=False)
+    confidence = Column(Float, nullable=True)
+    bws_used = Column(Boolean, default=False, nullable=False)
+    analysis_completed_at = Column(DateTime(timezone=True), nullable=True)
 
+    # 일기 수정 후 이전 분석 결과가 덮어쓰는 것 방지
+    analysis_version = Column(Integer, default=0, nullable=False)
+
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+
+    analysis_comment = Column(String, nullable=True)
+
+    author = relationship("User", back_populates="diaries")
+    analysis_data = relationship(
+        "Analysis",
+        back_populates="diary",
+        uselist=False
+    )
 
 # --- 3. 개별 일기 심층 분석 테이블 ---
 class Analysis(Base):

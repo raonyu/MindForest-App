@@ -20,20 +20,16 @@ import GloomyEmoji from './assets/icons/GloomyEmoji';
 
 
 export const EMOTIONS = [
-  // 1번째 줄 (슬픔, 분노, 평온)
-  { id: 'sadness', color: '#FFB661', icon: SadEmoji },
-  { id: 'anger', color: '#FFD25E', icon: AngryEmoji },
-  { id: 'calm', color: '#64E671', icon: CalmEmoji },
-  
-  // 2번째 줄 (기쁨, 불안, 눈물)
-  { id: 'joy', color: '#FF5B5B', icon: JoyEmoji },
-  { id: 'anxiety', color: '#FF6187', icon: AnxiousEmoji },
-  { id: 'crying', color: '#E961FF', icon: CryingEmoji },
-  
-  // 3번째 줄 (신남, 평화, 우울)
-  { id: 'excited', color: '#56EACF', icon: ExcitedEmoji },
-  { id: 'peaceful', color: '#5B9CFF', icon: PeacefulEmoji },
-  { id: 'gloomy', color: '#8A5CFF', icon: GloomyEmoji },
+  // Plutchik 8감정
+  // 기존 아이콘 자산을 재사용하되 id/name은 분석 모델과 정확히 맞춘다.
+  { id: 'joy',          name: '기쁨', color: '#FF5B5B', icon: JoyEmoji },
+  { id: 'trust',        name: '신뢰', color: '#5B9CFF', icon: PeacefulEmoji },
+  { id: 'fear',         name: '공포', color: '#FF6187', icon: AnxiousEmoji },
+  { id: 'surprise',     name: '놀람', color: '#56EACF', icon: ExcitedEmoji },
+  { id: 'sadness',      name: '슬픔', color: '#FFB661', icon: SadEmoji },
+  { id: 'disgust',      name: '혐오', color: '#8A5CFF', icon: GloomyEmoji },
+  { id: 'anger',        name: '분노', color: '#FFD25E', icon: AngryEmoji },
+  { id: 'anticipation', name: '기대', color: '#64E671', icon: CalmEmoji },
 ];
 
 export const BACKGROUNDS = [
