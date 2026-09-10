@@ -40,9 +40,13 @@ def get_mind_forest_report(db: Session, user_id: str):
     if "is_done" not in df.columns:
         df["is_done"] = False
 
-    # 4. 마음 온도(에너지 점수) 산출 및 보정
-    df["total_score"] = df[pos].sum(axis=1) - df[neg].sum(axis=1)
-    df["temp_val"] = (df["total_score"] + 50).clip(0, 100)
+    # 4. 마음 온도(에너지 점수) 산출 및 보정 (수정됨)
+    # 합 대신 평균을 내서 스케일을 0~100으로 맞춤
+    df["pos_avg"] = df[pos].mean(axis=1)
+    df["neg_avg"] = df[neg].mean(axis=1)
+    
+    # 기준점 50에 (긍정평균 - 부정평균)의 절반을 더해 0~100 사이로 보정
+    df["temp_val"] = (50 + (df["pos_avg"] - df["neg_avg"]) / 2).clip(0, 100)
 
     # 5. 기간별 필터링
     df_7 = df[df["created_at"] >= now - timedelta(days=7)].copy()
