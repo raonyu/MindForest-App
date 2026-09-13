@@ -12,10 +12,19 @@ def extract_random_texts(file_list, sample_size=5000):
                 
             for item in data:
                 try:
-                    # 챗봇(SS) 제외, 사람 말(HS)만 이어서 텍스트 생성
+                    # 챗봇(SS) 제외, 사람 말(HS)만 리스트로 추출
                     content = item['talk']['content']
                     hs_texts = [str(v) for k, v in content.items() if k.startswith('HS') and v]
-                    text = " ".join(hs_texts).strip()
+                    
+                    # 💡 [수정됨] A님 피드백 반영: 마지막 발화(계획/다짐) 제외 로직
+                    if len(hs_texts) > 1:
+                        # 발화가 2개 이상이면 마지막 대답을 제외하고 결합
+                        text = " ".join(hs_texts[:-1]).strip()
+                    elif len(hs_texts) == 1:
+                        # 발화가 1개뿐이라면 그대로 사용
+                        text = hs_texts[0].strip()
+                    else:
+                        text = ""
                     
                     # 텍스트가 비어있지 않으면 추가
                     if text:
