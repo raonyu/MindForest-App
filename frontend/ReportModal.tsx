@@ -23,9 +23,18 @@ interface ReportModalProps {
 const screenWidth = Dimensions.get('window').width;
 
 const reportTitles = [
-    "주간 지배 감정", "현재 마음 온도", "감정 롤러코스터 지수", "회복 탄력성",
-    "루틴 효능 랭킹", "기록 성공률", "에너지 변화", "마음 안전망 방어",
-    "레드존 확인", "마음의 가면", "아픔의 뿌리", "위기 도달 확률"
+    "주간 지배 감정",
+    "현재 마음 온도",
+    "최근 7일 마음 온도 흐름",
+    "회복 지수",
+    "루틴 효능 랭킹",
+    "기록 성공률",
+    "루틴 후 마음 온도 변화",
+    "급격한 감정 하락 후 회복",
+    "레드존 확인",
+    "자가보고 vs AI",
+    "주요 키워드",
+    "주의 지수"
 ];
 
 const getTemperatureColor = (tempStr: string | number) => {
@@ -60,13 +69,15 @@ const IndicatorCard = ({ index, data, title }: { index: number, data: any, title
                 const bgColor = getTemperatureColor(tempValue);
                 return (
                     <View style={[styles.vizContainer, { backgroundColor: bgColor, borderRadius: 20, padding: 24, alignItems: 'center' }]}>
-                        <Text style={{ fontSize: 48, color: 'white', fontWeight: 'bold' }}>{tempValue}°C</Text>
+                        <Text style={{ fontSize: 48, color: 'white', fontWeight: 'bold' }}>{tempValue}도</Text>
                         <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginTop: 14 }}>
-                            <Text style={{ fontSize: 15, color: 'white', fontWeight: '600' }}>지난 주 보다 {reportValue.msg || 0}°C 상승 📈</Text>
+                            <Text style={{ fontSize: 15, color: 'white', fontWeight: '600' }}>
+                                지난주 대비 {reportValue.msg || 0}도 차이
+                            </Text>
                         </View>
                     </View>
                 );
-            case 2: // 감정 롤러코스터 지수
+            case 2: // 최근 7일 마음 온도 흐름
                 const arr2 = Array.isArray(reportValue) ? reportValue : [];
                 if (arr2.length === 0) return <Text style={{textAlign: 'center', marginTop: 10, color: '#888'}}>데이터가 부족합니다.</Text>;
                 const chartDate = arr2.map((item: any) => item.created_at ? item.created_at.substring(5, 10).replace('-', '/') : '');
@@ -92,7 +103,14 @@ const IndicatorCard = ({ index, data, title }: { index: number, data: any, title
                         />
                     </View>
                 );
-            case 3: // 회복 탄력성
+            case 3: // 회복 지수
+                if (reportValue === null || reportValue === undefined || reportValue === '') {
+                    return (
+                        <Text style={{ textAlign: 'center', marginTop: 10, color: '#888' }}>
+                            회복 지수를 계산할 데이터가 부족합니다.
+                        </Text>
+                    );
+                }
                 const num3 = parseFloat(String(reportValue)) || 0;
                 return (
                     <View style={[styles.vizContainer, { alignItems: 'center', paddingVertical: 20 }]}>
@@ -138,18 +156,20 @@ const IndicatorCard = ({ index, data, title }: { index: number, data: any, title
                         </View>
                     </View>
                 );
-            case 6: // 에너지 변화
+            case 6: // 루틴 후 마음 온도 변화
                 return (
                     <View style={[styles.vizContainer, { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff8e1', padding: 24, borderRadius: 20, marginTop: 10 }]}>
                          <Text style={{ fontSize: 48 }}>⚡</Text>
-                         <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#f57c00', marginLeft: 16 }}>{reportValue}° 변화</Text>
+                         <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#f57c00', marginLeft: 16 }}>{reportValue}점 변화</Text>
                     </View>
                 );
-            case 7: // 마음 안전망 방어
+            case 7: // 급격한 감정 하락 후 회복
                 const defenseCount = Number(reportValue) || 0;
                 return (
                     <View style={[styles.vizContainer, { backgroundColor: '#f0f4f8', padding: 20, borderRadius: 20, marginTop: 10, alignItems: 'center' }]}>
-                        <Text style={{ fontSize: 18, color: '#455a64', marginBottom: 16, fontWeight: 'bold' }}>이번 주 {defenseCount}번의 하락 방어</Text>
+                        <Text style={{ fontSize: 18, color: '#455a64', marginBottom: 16, fontWeight: 'bold' }}>
+                            이번 주 급격한 감정 하락 후 {defenseCount}번 회복
+                        </Text>
                         <View style={{ flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 12 }}>
                             {Array.from({ length: defenseCount }).map((_, i) => (
                                 <Text key={i} style={{ fontSize: 36 }}>🛡️</Text>
@@ -169,7 +189,7 @@ const IndicatorCard = ({ index, data, title }: { index: number, data: any, title
                         ))}
                     </View>
                 );
-            case 9: // 마음의 가면
+            case 9: // 자가보고 vs AI
                 if (!reportValue || typeof reportValue !== 'object') return null;
                 const { user, ai, gap } = reportValue as any;
                 return (
@@ -177,21 +197,25 @@ const IndicatorCard = ({ index, data, title }: { index: number, data: any, title
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 }}>
                             <View style={{ alignItems: 'center', backgroundColor: '#f1f8e9', padding: 16, borderRadius: 16, width: '47%' }}>
                                 <Text style={{ fontSize: 14, color: '#555', marginBottom: 8 }}>나의 느낌</Text>
-                                <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#388e3c' }}>{user}°</Text>
+                                <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#388e3c' }}>
+                                    {user ?? '-'}점
+                                </Text>
                             </View>
                             <View style={{ alignItems: 'center', backgroundColor: '#e3f2fd', padding: 16, borderRadius: 16, width: '47%' }}>
                                 <Text style={{ fontSize: 14, color: '#555', marginBottom: 8 }}>AI 분석</Text>
-                                <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#1976d2' }}>{ai}°</Text>
+                                <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#1976d2' }}>
+                                    {ai ?? '-'}점
+                                </Text>
                             </View>
                         </View>
                         <View style={{ backgroundColor: '#fff', borderWidth: 1, borderColor: '#eee', padding: 16, borderRadius: 12, alignItems: 'center' }}>
                             <Text style={{ fontSize: 16, color: '#333' }}>
-                                감정 괴리: <Text style={{ fontWeight: 'bold', color: '#d32f2f', fontSize: 18 }}> {gap}°C</Text>
+                                감정 차이: <Text style={{ fontWeight: 'bold', color: '#d32f2f', fontSize: 18 }}> {gap ?? '-'}점</Text>
                             </Text>
                         </View>
                     </View>
                 );
-            case 10: // 아픔의 뿌리
+            case 10: // 주요 키워드
                 const keywords = Array.isArray(reportValue) ? reportValue : [];
                 if (keywords.length === 0) return <Text style={{textAlign: 'center', marginTop: 10, color: '#888'}}>감지된 키워드가 없습니다.</Text>;
                 return (
@@ -203,7 +227,7 @@ const IndicatorCard = ({ index, data, title }: { index: number, data: any, title
                         ))}
                     </View>
                 );
-            case 11: // 위기 도달 확률
+            case 11: // 주의 지수
                 const num11 = parseFloat(String(reportValue)) || 0;
                 return (
                     <View style={[styles.vizContainer, { alignItems: 'center', paddingVertical: 10 }]}>
@@ -219,8 +243,8 @@ const IndicatorCard = ({ index, data, title }: { index: number, data: any, title
                         >
                             {() => (
                                 <View style={{ alignItems: 'center' }}>
-                                    <Text style={{ fontSize: 40, color: '#d32f2f', fontWeight: 'bold' }}>{num11}%</Text>
-                                    <Text style={{ fontSize: 14, color: '#777', marginTop: 4 }}>위험도</Text>
+                                    <Text style={{ fontSize: 40, color: '#d32f2f', fontWeight: 'bold' }}>{num11}점</Text>
+                                    <Text style={{ fontSize: 14, color: '#777', marginTop: 4 }}>주의 지수</Text>
                                 </View>
                             )}
                         </AnimatedCircularProgress>
