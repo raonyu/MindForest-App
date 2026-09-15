@@ -455,7 +455,7 @@ def get_mind_forest_report(db: Session, user_id: str):
 
             "report_value":
                 f"{recovery_after_red}",
-        }
+        },
 
         "indicator_9": {
             "report_explain":
