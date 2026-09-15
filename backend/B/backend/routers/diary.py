@@ -13,8 +13,8 @@ import routine_manager
 
 # C 개발용 Mock 분석기
 # 나중에 B의 실제 emotion_pipeline으로 import만 교체
-from services.mock_emotion_pipeline import analyze_emotion_pipeline
-
+# B 실제 감정 분석 파이프라인
+from services.emotion_pipeline import analyze_emotion_pipeline
 
 router = APIRouter()
 
