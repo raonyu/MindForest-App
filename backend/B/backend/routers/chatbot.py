@@ -3,6 +3,7 @@ from database import get_db
 from sqlalchemy.orm import Session
 # [수정] 임포트 경로를 명확히 하고 중복 임포트를 제거합니다.
 from services.chatbot_logic import get_chat_response 
+from services.user_state_logic import analyze_user_state, build_chat_state_summary  # [수정] 사용자 상태 분석 함수 임포트
 from routine_manager import routine_manager  # 이 부분이 핵심입니다!
 import models
 from pydantic import BaseModel
@@ -29,11 +30,23 @@ def chat(data: ChatRequest, db: Session = Depends(get_db)):
     ).order_by(models.ChatHistory.created_at.asc()).all()
     chat_history = [{"role": h.role, "content": h.content} for h in history_objs]
 
-    # 2. AI 호출 (chatbot_logic.py 실행)
+    # 2. [수정] 상담 모드에서만 사용자 상태 분석 실행
+    state_summary = None
+    if user.is_onboarding_done:
+        try:
+            user_state = analyze_user_state(db, user_id)
+            state_summary = build_chat_state_summary(user_state)
+        except Exception as e:
+            print(f"사용자 상태 분석 오류: {e}")
+
+    # 3. AI 호출 (chatbot_logic.py 실행)
     ai_res = get_chat_response(
         user_message=message,
         chat_history=chat_history,
-        is_onboarding_done=user.is_onboarding_done
+        is_onboarding_done=user.is_onboarding_done,
+        user_animal=user.user_animal or "",   # [수정] 누락된 인수 추가
+        signup_date=user.created_at,            # [수정] 누락된 인수 추가
+        user_state=state_summary,               # [수정] 현재 사용자 상태 주입
     )
 
     # 3. 유저 메시지 저장
