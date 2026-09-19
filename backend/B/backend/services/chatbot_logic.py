@@ -244,7 +244,7 @@ def analyze_onboarding_answers(answers):
     }
 
 
-def get_chat_response(user_message, chat_history=None, is_onboarding_done=False, user_animal="", signup_date=None):
+def get_chat_response(user_message, chat_history=None, is_onboarding_done=False, user_animal="", signup_date=None, user_state=None):
     """
     마음의 숲 챗봇 엔진
     - Onboarding: 정해진 20문항을 순차적으로 제공
@@ -283,14 +283,40 @@ def get_chat_response(user_message, chat_history=None, is_onboarding_done=False,
             delta = datetime.now(signup_date.tzinfo) - signup_date
             days_since_signup = delta.days
 
+        # [수정] 사용자 현재 상태를 GPT 프론프트에 주입
+        state_block = ""
+        if user_state:
+            seven = user_state.get("seven_day_summary") or {}
+            survey = user_state.get("latest_survey") or {}
+            reasons = user_state.get("reasons") or []
+
+            delta_str = ""
+            delta_val = survey.get("score_delta")
+            if delta_val is not None:
+                sign = "+" if delta_val >= 0 else ""
+                delta_str = f" (이전 검사 대비 {sign}{delta_val}점)"
+
+            state_block = f"""
+[현재 사용자 상태 - 이 정보를 반드시 고려해서 개인화된 답변을 해줘]
+- 감정 상태: {user_state.get("emotion_state", "알 수 없음")}
+- 정신건강 위험도: {user_state.get("risk_level", "LOW")}
+- 최근 7일 부정 감정 평균: {seven.get("negative_avg", "N/A")}
+- 최근 7일 긍정 감정 평균: {seven.get("positive_avg", "N/A")}
+- 감정 추세: {seven.get("emotion_trend", "유지")}
+- 부정적 감정 지속 기간: {seven.get("consecutive_negative_days", 0)}일
+- 자가점검({survey.get("scale_name", "없음")}): {survey.get("score", "기록 없음")}점{delta_str}
+- 주요 분석 근거: {"; ".join(reasons) if reasons else "없음"}
+"""
+
         system_prompt = f"""
         너는 '마음의 숲'의 다정한 상담사야. 
         사용자는 현재 [{user_animal}] 유형으로 진단받았어.
         
-        [정보]
+        [기본 정보]
         - 사용자가 우리 숲에 머문 지 {days_since_signup}일째야.
         - 사용자의 유형에 맞춰 따뜻하게 공감하고 격려해줘.
         - 대화 중간에 오늘의 기분이나 마음 온도를 물어봐줘.
+        {state_block}
         """
         
         try:

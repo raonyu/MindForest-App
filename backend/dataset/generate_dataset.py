@@ -7,16 +7,17 @@ from openai import OpenAI
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 def get_labels(text):
-    # [최종 고도화] 팀원 A 피드백 + 다중 라벨 + 무감정 완벽 반영 프롬프트
+    # [진짜 최종] A님 피드백(anticipation 완화, trust 기준 추가) 완벽 반영 프롬프트
     prompt = f"""
 당신은 감정 분석 데이터 라벨링 전문가입니다.
 주어진 텍스트를 읽고, 문맥상 존재하는 모든 Plutchik 8가지 기본 감정을 찾아 각각 0(없음) 또는 1(있음)로 판단해 주세요.
 
-[🚨 매우 엄격한 라벨링 기준 🚨]
-1. 다중 감정 허용 (Multi-label): 텍스트에 드러난 감정이 여러 개라면 주저하지 말고 해당하는 모든 감정에 1을 부여하세요. (예: 슬픔과 분노가 같이 느껴지면 둘 다 1)
-2. anticipation (기대) 엄격 제어: 무언가를 '설레며 기다리거나 긍정적으로 기대하는 감정'일 때만 1입니다. "내일은 일찍 일어나야지", "운동을 해야겠어", "어떻게 해야 할까?" 같은 단순한 미래 계획, 다짐, 해결책 모색, 질문은 절대로 anticipation이 아닙니다 (무조건 0으로 처리).
-3. 뚜렷한 감정만 1 부여: 텍스트에 감정이 명확하고 강하게 드러난 경우에만 1로 표시하세요. 모호하거나 추측해야 한다면 무조건 0을 부여합니다.
-4. 감정 없음(Neutral) 허용: 뚜렷한 감정이 없거나 단순한 일상, 행동, 객관적 사실 나열뿐이라면 8개 감정 모두 0이어야 합니다. 억지로 감정을 만들어내지 마세요.
+[🚨 라벨링 세부 기준 (필독) 🚨]
+1. 다중 감정 허용 (Multi-label): 텍스트에 드러난 감정이 여러 개라면 주저하지 말고 해당하는 모든 감정에 1을 부여하세요. (예: 기대감과 신뢰감이 동시에 느껴지면 둘 다 1)
+2. anticipation (기대) - 기준 완화: "앞으로 잘 되길 바라는 마음, 긍정적인 기대, 설렘, 희망"이 조금이라도 느껴진다면 1을 부여하세요. (단, 감정이 실리지 않은 '단순한 미래 계획, 다짐, 질문'은 여전히 0입니다.)
+3. trust (신뢰) - 기준 추가: "누군가(또는 자신)를 믿거나 굳게 의지하는 마음, 안도감, 든든함, 신뢰감"이 느껴진다면 1을 부여하세요.
+4. 뚜렷한 감정만 1 부여: 텍스트에 감정이 명확하게 드러난 경우에만 1로 표시하세요. 모호하거나 억지로 추측해야 한다면 0을 부여합니다.
+5. 감정 없음(Neutral) 허용: 뚜렷한 감정이 없거나 단순한 일상, 행동, 객관적 사실 나열뿐이라면 8개 감정 모두 0이어야 합니다. 억지로 감정을 만들어내지 마세요.
 
 텍스트: "{text}"
 
@@ -46,9 +47,9 @@ def get_labels(text):
         return None
 
 def main():
-    print("🚀 GPT 라벨링 및 데이터셋 생성 시작...")
+    print("🚀 GPT 라벨링 및 데이터셋 재생성 시작 (anticipation/trust 타겟팅 최적화)...")
     
-    # 1. 감성대화 말뭉치 (마지막 발화 잘라낸 버전) 불러오기
+    # 1. 감성대화 말뭉치 불러오기
     try:
         with open("sampled_texts.json", "r", encoding="utf-8") as f:
             texts = json.load(f)
@@ -56,7 +57,7 @@ def main():
         print("🚨 sampled_texts.json 파일이 없습니다. extract_texts.py를 먼저 실행하세요.")
         return
         
-    # 2. 직접 생성한 '진짜 무감정 데이터 300개' 불러오기
+    # 2. 진짜 무감정 데이터 불러오기
     try:
         with open("neutral_texts.json", "r", encoding="utf-8") as f:
             neutral_sentences = json.load(f)
@@ -65,7 +66,7 @@ def main():
         print("🚨 neutral_texts.json 파일이 없습니다! 파일을 생성해주세요.")
         return
     
-    # 3. 데이터 합치기 (무감정 데이터가 확실히 들어가도록 맨 앞에 배치)
+    # 3. 데이터 합치기
     combined_texts = neutral_sentences + texts
         
     LIMIT = 5000
@@ -80,13 +81,13 @@ def main():
         if labels and "labels" in labels:
             final_dataset.append({
                 "text": text,
-                "labels": labels["labels"] # JSON 응답 구조에서 labels 알맹이만 추출
+                "labels": labels["labels"]
             })
         
-        # 토큰 제한(Rate Limit) 방지를 위해 0.2초 휴식
+        # API 속도 제한 방지용 딜레이
         time.sleep(0.2)
         
-    # 8:1:1 비율로 Train / Val / Test 분할
+    # 8:1:1 비율 분할
     random.shuffle(final_dataset)
     total = len(final_dataset)
     train_end = int(total * 0.8)
@@ -96,7 +97,6 @@ def main():
     val_data = final_dataset[train_end:val_end]
     test_data = final_dataset[val_end:]
     
-    # 파일 저장 함수
     def save_jsonl(data, filename):
         with open(filename, 'w', encoding='utf-8') as f:
             for row in data:
