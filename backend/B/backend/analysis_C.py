@@ -4,6 +4,10 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 import models
 
+# Part 2 - 개인 감정 시계열 분석
+from services.emotion_trend_logic import analyze_personal_emotion_trend
+
+
 MIN_REPORT_DIARIES = 3
 
 POS_EMOTIONS = ["joy", "trust", "anticipation", "surprise"]
@@ -116,7 +120,10 @@ def get_mind_forest_report(db: Session, user_id: str):
         if col not in df.columns:
             df[col] = 0.0
 
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
+        df[col] = pd.to_numeric(
+            df[col],
+            errors="coerce",
+        ).fillna(0.0)
 
     if "analysis_comment" not in df.columns:
         df["analysis_comment"] = ""
@@ -149,22 +156,13 @@ def get_mind_forest_report(db: Session, user_id: str):
         df["created_at"] >= now - timedelta(days=7)
     ].copy()
 
-    df_3 = (
-        df[df["created_at"] >= now - timedelta(days=3)]
-        .sort_values("created_at")
-        .reset_index(drop=True)
-        .copy()
-    )
-
     df_last_week = df[
         (df["created_at"] < now - timedelta(days=7))
         & (df["created_at"] >= now - timedelta(days=14))
     ].copy()
 
     # ---------------------------------------------------------
-    # indicator 1 - 주간 지배 감정
-    # 최신 라벨링에서 neutral(all-zero) 데이터가 추가될 수 있으므로
-    # 모든 감정이 기준점 50 미만이면 neutral로 처리
+    # indicator 1 - 지배 감정
     # ---------------------------------------------------------
 
     emoji_map = {
@@ -176,19 +174,13 @@ def get_mind_forest_report(db: Session, user_id: str):
         "surprise": "😲",
         "disgust": "🤮",
         "anticipation": "⏳",
-        "neutral": "😐",
     }
 
-    if df_7.empty:
-        top_emo = "neutral"
-    else:
-        weekly_emotion_avg = df_7[ALL_EMOTIONS].mean()
-
-        max_emotion = weekly_emotion_avg.idxmax()
-        max_score = float(weekly_emotion_avg.max())
-
-        # 50점 미만이면 모델이 명확한 감정을 검출하지 못한 것으로 처리
-        top_emo = max_emotion if max_score >= 50 else "neutral"
+    top_emo = (
+        df_7[ALL_EMOTIONS].mean().idxmax()
+        if not df_7.empty
+        else "joy"
+    )
 
     # ---------------------------------------------------------
     # indicator 2, 3 - 마음 온도
@@ -206,7 +198,10 @@ def get_mind_forest_report(db: Session, user_id: str):
         else this_avg
     )
 
-    diff = round(this_avg - last_avg, 1)
+    diff = round(
+        this_avg - last_avg,
+        1,
+    )
 
     trend_points = (
         df_7[["created_at", "temp_val"]]
@@ -214,16 +209,22 @@ def get_mind_forest_report(db: Session, user_id: str):
         .copy()
     )
 
-    trend_points["temp_val"] = trend_points["temp_val"].round(1)
+    trend_points["temp_val"] = (
+        trend_points["temp_val"].round(1)
+    )
+
     trend_points["created_at"] = (
-        trend_points["created_at"].dt.strftime("%Y-%m-%d")
+        trend_points["created_at"]
+        .dt.strftime("%Y-%m-%d")
     )
 
     # ---------------------------------------------------------
-    # indicator 4 - 회복 지수
+    # indicator 4 - 기존 회복 지수
     # ---------------------------------------------------------
 
-    recovery_index = calculate_recovery_index(df_7)
+    recovery_index = calculate_recovery_index(
+        df_7
+    )
 
     if recovery_index is None:
         recovery_explain = (
@@ -231,11 +232,13 @@ def get_mind_forest_report(db: Session, user_id: str):
             "하락-회복 구간이 충분하지 않습니다."
         )
         recovery_value = None
+
     else:
         recovery_explain = (
             f"최근 감정 하락 이후 회복 정도를 기준으로 "
             f"회복 지수는 {recovery_index}%입니다."
         )
+
         recovery_value = f"{recovery_index}%"
 
     # ---------------------------------------------------------
@@ -250,6 +253,7 @@ def get_mind_forest_report(db: Session, user_id: str):
     routine_rank = []
 
     if not completed_routines.empty:
+
         routine_effects = (
             completed_routines
             .groupby("routine_name")["score_diff"]
@@ -261,9 +265,13 @@ def get_mind_forest_report(db: Session, user_id: str):
         routine_rank = [
             {
                 "routine": str(routine),
-                "effect": round(float(effect), 1),
+                "effect": round(
+                    float(effect),
+                    1,
+                ),
             }
-            for routine, effect in routine_effects.items()
+            for routine, effect
+            in routine_effects.items()
         ]
 
     # ---------------------------------------------------------
@@ -271,63 +279,79 @@ def get_mind_forest_report(db: Session, user_id: str):
     # ---------------------------------------------------------
 
     if not completed_routines.empty:
+
         routine_avg_change = round(
-            float(completed_routines["score_diff"].mean()), 1
+            float(
+                completed_routines[
+                    "score_diff"
+                ].mean()
+            ),
+            1,
         )
+
     else:
         routine_avg_change = 0.0
 
     # ---------------------------------------------------------
-    # indicator 8, 9 - 급격한 하락 및 회복
+    # indicator 8, 9
+    # Part 2 개인 시계열 분석 결과 사용
+    #
+    # 기존:
+    # 시간 차이 계산 → 시간당 기울기 < -20
+    #
+    # 변경:
+    # 기록 간 급락 + 개인 기준선 이탈 기반 레드존 사용
     # ---------------------------------------------------------
 
-    red_points = []
-    recovery_after_red = 0
+    trend_result = analyze_personal_emotion_trend(
+        db,
+        user_id,
+    )
 
-    if len(df_3) >= 2:
+    red_zone_result = trend_result.get(
+        "red_zone",
+        {},
+    )
 
-        time_diff = (
-            df_3["created_at"]
-            .diff()
-            .dt.total_seconds()
-            / 3600
+    recovery_result = trend_result.get(
+        "recovery",
+        {},
+    )
+
+    red_points = [
+        event.get("date")
+        for event in red_zone_result.get(
+            "events",
+            [],
         )
+        if event.get("date") is not None
+    ]
 
-        time_diff = time_diff.replace(0, np.nan)
-
-        df_3["slope"] = (
-            df_3["temp_val"].diff() / time_diff
-        )
-
-        red_indexes = df_3.index[
-            df_3["slope"] < -20
-        ].tolist()
-
-        for idx in red_indexes:
-
-            red_points.append(
-                int(df_3.loc[idx, "created_at"].day)
-            )
-
-            # 급격한 하락 이후 다음 기록에서 상승하면 회복으로 계산
-            if idx + 1 < len(df_3):
-                if (
-                    df_3.loc[idx + 1, "temp_val"]
-                    > df_3.loc[idx, "temp_val"]
-                ):
-                    recovery_after_red += 1
+    recovery_after_red = recovery_result.get(
+        "recovery_observed_count",
+        0,
+    )
 
     # ---------------------------------------------------------
     # indicator 10 - 사용자 Self Report vs AI
     # ---------------------------------------------------------
 
     latest_row = (
-        df.sort_values("created_at", ascending=False)
+        df.sort_values(
+            "created_at",
+            ascending=False,
+        )
         .iloc[0]
     )
 
-    ai_val = round(float(latest_row["temp_val"]), 1)
-    user_val = self_report_to_score(latest_row)
+    ai_val = round(
+        float(latest_row["temp_val"]),
+        1,
+    )
+
+    user_val = self_report_to_score(
+        latest_row
+    )
 
     if user_val is None:
 
@@ -346,7 +370,10 @@ def get_mind_forest_report(db: Session, user_id: str):
 
     else:
 
-        gap = round(abs(user_val - ai_val), 1)
+        gap = round(
+            abs(user_val - ai_val),
+            1,
+        )
 
         gap_explain = (
             f"사용자 자가보고와 AI 감정지수는 "
@@ -382,7 +409,13 @@ def get_mind_forest_report(db: Session, user_id: str):
     # ---------------------------------------------------------
 
     attention_index = round(
-        max(0.0, min(100.0, 100 - this_avg)),
+        max(
+            0.0,
+            min(
+                100.0,
+                100 - this_avg,
+            ),
+        ),
         1,
     )
 
@@ -393,19 +426,32 @@ def get_mind_forest_report(db: Session, user_id: str):
     return {
 
         "indicator_1": {
-            "report_explain": emoji_map.get(top_emo, "😐"),
-            "report_value": emoji_map.get(top_emo, "😐"),
+            "report_explain":
+                emoji_map.get(
+                    top_emo,
+                    "😐",
+                ),
+
+            "report_value":
+                emoji_map.get(
+                    top_emo,
+                    "😐",
+                ),
         },
 
         "indicator_2": {
             "report_explain":
-                f"현재 마음 온도는 {round(this_avg, 1)}도이며 "
+                f"현재 마음 온도는 "
+                f"{round(this_avg, 1)}도이며 "
                 f"지난주보다 {abs(diff)}도 "
                 f"{'높아졌어요' if diff >= 0 else '낮아졌어요'}.",
 
             "report_value": {
-                "temp": f"{round(this_avg, 1)}",
-                "msg": f"{abs(diff)}",
+                "temp":
+                    f"{round(this_avg, 1)}",
+
+                "msg":
+                    f"{abs(diff)}",
             },
         },
 
@@ -414,12 +460,17 @@ def get_mind_forest_report(db: Session, user_id: str):
                 "최근 7일간 마음 온도 흐름입니다.",
 
             "report_value":
-                trend_points.to_dict("records"),
+                trend_points.to_dict(
+                    "records"
+                ),
         },
 
         "indicator_4": {
-            "report_explain": recovery_explain,
-            "report_value": recovery_value,
+            "report_explain":
+                recovery_explain,
+
+            "report_value":
+                recovery_value,
         },
 
         "indicator_5": {
@@ -433,7 +484,8 @@ def get_mind_forest_report(db: Session, user_id: str):
         "indicator_6": {
             "report_explain":
                 f"14일 중 "
-                f"{df['created_at'].dt.date.nunique()}일 기록 성공",
+                f"{df['created_at'].dt.date.nunique()}일 "
+                f"기록 성공",
 
             "report_value":
                 f"{df['created_at'].dt.date.nunique()}",
@@ -450,8 +502,9 @@ def get_mind_forest_report(db: Session, user_id: str):
 
         "indicator_8": {
             "report_explain":
-                f"🛡️ 이번 주 급격한 감정 하락 이후 "
-                f"{recovery_after_red}번 회복했습니다.",
+                f"🛡️ 최근 급격한 감정 하락 이후 "
+                f"{recovery_after_red}번 회복이 "
+                f"관찰되었습니다.",
 
             "report_value":
                 f"{recovery_after_red}",
@@ -459,8 +512,8 @@ def get_mind_forest_report(db: Session, user_id: str):
 
         "indicator_9": {
             "report_explain":
-                f"🔴 {len(red_points)}개의 레드존 포인트가 "
-                f"감지되었습니다.",
+                f"🔴 {len(red_points)}개의 "
+                f"레드존 포인트가 감지되었습니다.",
 
             "report_value":
                 red_points,
@@ -476,7 +529,8 @@ def get_mind_forest_report(db: Session, user_id: str):
 
         "indicator_11": {
             "report_explain":
-                "이번 주 기록에서 자주 드러난 키워드입니다.",
+                "이번 주 기록에서 자주 드러난 "
+                "키워드입니다.",
 
             "report_value":
                 keywords,
@@ -484,8 +538,8 @@ def get_mind_forest_report(db: Session, user_id: str):
 
         "indicator_12": {
             "report_explain":
-                f"현재 마음 상태를 기준으로 주의 지수는 "
-                f"{attention_index}점입니다.",
+                f"현재 마음 상태를 기준으로 "
+                f"주의 지수는 {attention_index}점입니다.",
 
             "report_value":
                 f"{attention_index}",
