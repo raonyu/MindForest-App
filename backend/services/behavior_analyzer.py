@@ -15,14 +15,15 @@ backend_dir = os.path.dirname(current_dir)
 if backend_dir not in sys.path:
     sys.path.append(backend_dir)
 
+# routine_manager 임포트 확인
 try:
     from B.backend.routine_manager import routine_manager
 except ImportError:
     routine_manager = None
 
-# models.py에서 Diary 모델 가져오기 (경로 매핑 완료)
+# models.py에서 Diary와 User 모델 모두 가져오기
 try:
-    from B.backend.models import Diary 
+    from B.backend.models import Diary, User 
 except ImportError:
     pass
 
@@ -37,14 +38,12 @@ def analyze_routine_effect(diaries):
     routine_stats = defaultdict(lambda: {"temps": [], "count": 0})
     
     for d in diaries:
-        # models.py 구조에 맞춘 8감정 기반 마음 온도 계산
         pos = getattr(d, 'joy', 0.0) + getattr(d, 'trust', 0.0) + getattr(d, 'anticipation', 0.0) + getattr(d, 'surprise', 0.0)
         neg = getattr(d, 'sadness', 0.0) + getattr(d, 'anger', 0.0) + getattr(d, 'fear', 0.0) + getattr(d, 'disgust', 0.0)
         real_temp = pos - neg
         
         total_temps.append(real_temp)
         
-        # 루틴 기록 수집
         routine_name = getattr(d, 'routine_name', None)
         if getattr(d, 'is_done', False) and routine_name:
             routine_stats[routine_name]["temps"].append(real_temp)
@@ -54,14 +53,22 @@ def analyze_routine_effect(diaries):
 
     effects = []
     for name, stat in routine_stats.items():
-        if stat["count"] >= 2: # 최소 2회 이상 수행 시 신뢰도 확보
+        if stat["count"] >= 2:
             routine_avg = sum(stat["temps"]) / len(stat["temps"])
             net_effect = round(routine_avg - baseline_temp, 1) 
             
+            if net_effect > 0:
+                msg = f"이 루틴을 실천한 날은 평소보다 마음 온도가 {net_effect}도 더 높았어요!"
+            elif net_effect < 0:
+                msg = f"이 루틴을 한 날은 조금 힘드셨군요. 난이도를 조금 낮춰보는 건 어떨까요?"
+            else:
+                msg = "이 루틴은 일상에 잔잔한 안정감을 주고 있어요."
+
             effects.append({
                 "routine_name": name,
                 "avg_effect": f"+{net_effect}" if net_effect > 0 else str(net_effect),
-                "count_based": stat["count"]
+                "count_based": stat["count"],
+                "insight_message": msg
             })
             
     effects = sorted(effects, key=lambda x: float(x["avg_effect"]), reverse=True)
@@ -100,7 +107,6 @@ def extract_keywords_and_context(diaries):
     if not diary_texts:
         return {"summary_message": "일기 내용이 짧아 키워드를 분석할 수 없어요.", "keywords": []}
 
-    # GPT에게 핵심 키워드 3개 단순/명확하게 추출 요청
     prompt = f"""
     아래는 사용자가 일주일간 작성한 일기 내용입니다.
     이 일기들에서 가장 핵심이 되는 주요 키워드(명사)를 최대 3개만 추출해주세요.
@@ -135,7 +141,6 @@ def extract_keywords_and_context(diaries):
 
     sorted_contexts = sorted(context_analysis, key=lambda x: x["count"], reverse=True)[:3]
 
-    # 1회 등장 엣지케이스 방어용 동적 코멘트
     if not sorted_contexts:
         summary_msg = "주요 키워드를 뽑기에 일기 내용이 조금 부족했어요."
     elif sorted_contexts[0]["count"] == 1:
@@ -154,21 +159,20 @@ def extract_keywords_and_context(diaries):
 def get_personalized_recommendations(diaries, user_category="DEPRESSION"):
     effect_result = analyze_routine_effect(diaries)
     
-    # Track A: 초기 유저 (Cold Start)
     if effect_result["status"] == "insufficient":
         try:
-            recs = routine_manager._pick_routine_contents_from_categories([user_category])
+            lifestyle_cats = routine_manager._get_lifestyle_categories(user_category)
+            recs = routine_manager._pick_routine_contents_from_categories(lifestyle_cats)
             return [{"routine": r, "reason": "아직 숲에 오신 지 얼마 안 돼서, 현재 마음에 가장 알맞은 루틴을 준비했어요."} for r in recs]
         except:
             return [{"routine": "가벼운 동네 산책하기", "reason": "마음을 환기하는 데 가장 좋은 기본 루틴이에요."}]
 
-    # Track B: 데이터 보유 유저 (Exploitation & Exploration)
     recommendations = []
     best = effect_result["data"]
     
     recommendations.append({
         "routine": best[0]["routine_name"],
-        "reason": f"분석 결과, 이 루틴을 했을 때 평소보다 마음 온도가 평균 {best[0]['avg_effect']}도 상승했어요!"
+        "reason": f"분석 결과, {best[0]['insight_message']}"
     })
 
     if len(best) > 1:
@@ -179,7 +183,8 @@ def get_personalized_recommendations(diaries, user_category="DEPRESSION"):
         
     try:
         if routine_manager:
-            for rec in routine_manager._pick_routine_contents_from_categories([user_category]):
+            lifestyle_cats = routine_manager._get_lifestyle_categories(user_category)
+            for rec in routine_manager._pick_routine_contents_from_categories(lifestyle_cats):
                 if not any(r["routine"] == rec for r in recommendations):
                     recommendations.append({"routine": rec, "reason": "지루하지 않게 숲지기가 새로운 루틴도 하나 추천해 드려요!"})
                     break
@@ -190,24 +195,20 @@ def get_personalized_recommendations(diaries, user_category="DEPRESSION"):
 
 # =========================================================
 # [Weekly Report: Part 3 Indicators API]
-# 파트 3 (루틴 기여도, 주간 키워드, 맞춤 추천) 전용 데이터 생성 함수
-#
-# API 라우터 담당자님(파트 1) 필독:
-# 이 함수는 '주간 리포트 전체'가 아닌 '파트 3'에 해당하는 지표 데이터만 생성합니다.
-# DB 세션(db_session)과 user_id(문자열)를 넘겨주시면 최근 7일 치 일기를 
-# 직접 필터링하여 파트 3용 분석 결과(dict)를 반환합니다.
-# 라우터에서 이 결과를 받아 다른 파트의 지표(마음 온도 등)와 병합하여 프론트로 전달해 주세요.
+# 파트 3 (주간 키워드, 루틴 기여도, 맞춤 추천) 전용 데이터 생성 함수
 # =========================================================
 def generate_weekly_report(db_session, user_id: str):
     try:
-        # 1. DB 직접 조회: UTC 기준으로 오늘부터 7일 전(168시간) 이내의 일기 필터링
+        # 실제 유저 정보를 DB에서 조회해서 assigned_category(질병유형) 가져오기
+        user = db_session.query(User).filter(User.id == user_id).first()
+        actual_user_category = user.assigned_category if user and getattr(user, 'assigned_category', None) else "DEPRESSION"
+
         seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
         recent_diaries = db_session.query(Diary).filter(
             Diary.user_id == user_id,
             Diary.created_at >= seven_days_ago
         ).all()
         
-        # 2. 예외 처리: 최근 7일간 기록된 일기가 없는 경우
         if not recent_diaries:
             return {
                 "status": "empty", 
@@ -215,19 +216,21 @@ def generate_weekly_report(db_session, user_id: str):
                 "data": None
             }
             
-        # 3. 파트 3 담당 분석 엔진 가동
+        # 파트 3 담당 분석 엔진 가동
         keywords_data = extract_keywords_and_context(recent_diaries)
-        routine_data = get_personalized_recommendations(recent_diaries, user_category="DEPRESSION") # 추후 User 테이블에서 카테고리 연동 가능
+        routine_effect_data = analyze_routine_effect(recent_diaries) 
         
-        # 4. 파트 3 지표용 JSON 반환
+        routine_recs_data = get_personalized_recommendations(recent_diaries, user_category=actual_user_category) 
+        
         return {
             "status": "success",
             "message": "파트 3 지표 생성 완료",
             "data": {
                 "analyzed_count": len(recent_diaries),
                 "part3_indicators": {
-                    "keywords_analysis": keywords_data,
-                    "routine_recommendations": routine_data
+                    "keywords_analysis": keywords_data,          
+                    "routine_effect": routine_effect_data,       
+                    "routine_recommendations": routine_recs_data 
                 }
             }
         }
