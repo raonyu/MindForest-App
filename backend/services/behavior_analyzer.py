@@ -27,6 +27,9 @@ try:
 except ImportError:
     pass
 
+# 주간 리포트 최소 생성 기준 (analysis_C.py)
+MIN_DIARIES_FOR_REPORT = 3
+
 # ---------------------------------------------------------
 # [지표 7] 루틴과 감정 변화 (베이스라인 대비 순수 기여도 분석)
 # ---------------------------------------------------------
@@ -209,17 +212,17 @@ def generate_weekly_report(db_session, user_id: str):
             Diary.created_at >= seven_days_ago
         ).all()
         
-        if not recent_diaries:
+        # [개선됨] 일기가 1~2개뿐이라면 엉성한 리포트가 나가지 않도록 차단
+        if len(recent_diaries) < MIN_DIARIES_FOR_REPORT:
             return {
                 "status": "empty", 
-                "message": "최근 7일간 작성된 일기가 없어 분석할 수 없습니다.",
+                "message": f"주간 리포트를 생성하기에는 데이터가 조금 부족해요. (최근 7일 중 최소 {MIN_DIARIES_FOR_REPORT}일 기록 필요)",
                 "data": None
             }
             
         # 파트 3 담당 분석 엔진 가동
         keywords_data = extract_keywords_and_context(recent_diaries)
         routine_effect_data = analyze_routine_effect(recent_diaries) 
-        
         routine_recs_data = get_personalized_recommendations(recent_diaries, user_category=actual_user_category) 
         
         return {
