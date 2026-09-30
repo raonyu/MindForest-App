@@ -1,10 +1,10 @@
 {
-  "joy": 0.37,
-  "trust": 0.34,
-  "fear": 0.43,
-  "surprise": 0.32,
-  "sadness": 0.34,
-  "disgust": 0.27,
-  "anger": 0.32,
-  "anticipation": 0.4
+  "joy": 0.25,
+  "trust": 0.33,
+  "fear": 0.28,
+  "surprise": 0.22,
+  "sadness": 0.56,
+  "disgust": 0.22,
+  "anger": 0.36,
+  "anticipation": 0.11
 }

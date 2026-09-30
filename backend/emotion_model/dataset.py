@@ -26,6 +26,8 @@ def load_jsonl(path: str | Path) -> tuple[list[str], list[list[float]]]:
             record_labels = record.get("labels")
             if not text or record_labels is None:
                 raise ValueError(f"{path}:{line_number} — text 또는 labels 누락")
+            # GPT 라벨링 결과에 " anticipation"처럼 공백이 섞인 키가 있어 정리한다.
+            record_labels = {key.strip(): value for key, value in record_labels.items()}
 
             missing = [emotion for emotion in EMOTIONS if emotion not in record_labels]
             if missing:

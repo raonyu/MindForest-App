@@ -12,7 +12,7 @@ from sklearn.metrics import f1_score, precision_recall_fscore_support
 from dataset import load_jsonl
 from emotion_classifier import EMOTIONS, THRESHOLD_FILE, EmotionClassifier
 
-DATA_DIR = Path(__file__).parent / "data"
+DATA_DIR = Path(__file__).parent.parent / "dataset"
 THRESHOLD_GRID = np.arange(0.05, 0.96, 0.01)
 
 

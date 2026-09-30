@@ -54,7 +54,10 @@ class Diary(Base):
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.datetime.now(datetime.timezone.utc))
     analysis_comment = Column(String)
-    
+
+    # [주간 리포트] 상황·키워드 카드용. 쉼표로 구분된 키워드 (예: "시험,수면")
+    keywords = Column(String, nullable=True)
+
     author = relationship("User", back_populates="diaries")
     analysis_data = relationship("Analysis", back_populates="diary", uselist=False)
 
@@ -70,6 +73,24 @@ class Analysis(Base):
     feedback = Column(Text)
 
     diary = relationship("Diary", back_populates="analysis_data")
+
+
+# --- 3-1. 복합 감정(BWS) 판별 기록 테이블 ---
+class BwsRecord(Base):
+    """감정 점수가 비슷하게 경합해서 BWS 검증을 돌린 날의 기록."""
+    __tablename__ = "bws_records"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(String, ForeignKey("users.id"), index=True)
+    diary_id = Column(Integer, ForeignKey("diaries.id"))
+
+    # 경합한 후보 감정 (쉼표 구분, 예: "sadness,anger")
+    candidates = Column(String)
+    best_emotion = Column(String, nullable=True)
+    worst_emotion = Column(String, nullable=True)
+    reasoning = Column(Text, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.datetime.now(datetime.timezone.utc))
 
 
 # --- 4. 설문 관련 테이블 ---

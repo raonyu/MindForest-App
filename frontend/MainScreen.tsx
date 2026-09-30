@@ -2,13 +2,10 @@ import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { useMainContext } from './MainContext';
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Alert, View, Text, TouchableOpacity, ScrollView, Modal } from 'react-native';
-import ReportModal, { ReportResult } from './ReportModal';
+import ReportModal, { WeeklyReport } from './ReportModal';
 import { useBottomBar } from './BottomBarContext';
 import { API_BASE_URL } from './config';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
-
-//임시 리포트 데이터
-const MOCK_REPORT = { "indicator_1": { "report_explain": "🐢", "report_value": "🐢" }, "indicator_2": { "report_explain": "현재 마음 온도는 72.5도 지난주보다 15도 높아졌어요", "report_value": { "temp": "72.5", "msg": "15" } }, "indicator_3": { "report_explain": "이번 주 감정의 파동이 적절하게 유지되고 있습니다.", "report_value": [{ "created_at": "2026-04-01", "temp_val": 65.2 }, { "created_at": "2026-04-02", "temp_val": 70.1 }, { "created_at": "2026-04-03", "temp_val": 68.5 }] }, "indicator_4": { "report_explain": "루틴을 꾸준히 수행한 결과 회복 탄력성이 72.5%로 높게 나타납니다.", "report_value": "72.5%" }, "indicator_5": { "report_explain": "산책 루틴이 당신의 기분을 가장 빠르게 회복시켜 주었습니다.", "report_value": [{ "routine": "산책", "effect": 85 }, { "routine": "명상", "effect": 60 }] }, "indicator_6": { "report_explain": "14일 중 12일 기록 성공", "report_value": "12" }, "indicator_7": { "report_explain": "루틴 수행 여부에 따라 에너지가 15도 변화하는 패턴이 확인됩니다.", "report_value": "15" }, "indicator_8": { "report_explain": "🛡️ 이번 주 5번의 급격한 감정 하락 방어", "report_value": "5" }, "indicator_9": { "report_explain": "🔴 [8, 15, 22]개의 레드존 포인트가 감지되었습니다.", "report_value": [8, 15, 22] }, "indicator_10": { "report_explain": "사용자님의 감정점수는 AI 예측과 3.5도 차이가 나요.", "report_value": { "user": 72.5, "ai": 69.0, "gap": 3.5 } }, "indicator_11": { "report_explain": "이번 주 당신을 괴롭힌 키워드는 '업무', '불면', '관계'입니다.", "report_value": ["업무", "불면", "관계"] }, "indicator_12": { "report_explain": "현재 패턴 유지 시 위기 도달 확률은 27.5%입니다.", "report_value": "27.5" } };
 
 //루틴 데이터 구조
 interface routineData {
@@ -91,10 +88,10 @@ const fetchReportData = async (userID: string): Promise<any | null> => {
   }
 }
 
-const normalizeWeeklyAnalysis = (weeklyAnalysis: currentData['weekly_analysis']): ReportResult | null => {
-  if (!weeklyAnalysis) return null;
-  if ((weeklyAnalysis as { status?: string }).status === 'no_data') return null;
-  return weeklyAnalysis as ReportResult;
+// 백엔드가 카드 구조(weekly_report)를 내려준다. 카드가 없으면 모달이 안내 문구를 보여준다.
+const normalizeWeeklyReport = (weeklyReport: any): WeeklyReport | null => {
+  if (!weeklyReport || !weeklyReport.cards) return null;
+  return weeklyReport as WeeklyReport;
 };
 
 interface RoutinesProps {
@@ -168,7 +165,7 @@ const MainScreen = () => {
   const { handleLogOut, user, setUser } = useMainContext();
   const [currentUserData, setCurrentUserData] = useState<currentData | null>(null);
   const [emotionMessage, setEmotionMessage] = useState<emotionData | null>(null);
-  const [reportData, setReportData] = useState<any>(null);
+  const [reportData, setReportData] = useState<WeeklyReport | null>(null);
   const [testListModalVisible, setTestListModalVisible] = useState(false);
   const [animalList, setAnimalList] = useState<any[]>([]);
 
@@ -249,7 +246,7 @@ const MainScreen = () => {
 
       const report = await fetchReportData(user.user_id);
       if (report) {
-        setReportData(normalizeWeeklyAnalysis(report.weekly_analysis));
+        setReportData(normalizeWeeklyReport(report.weekly_report));
       }
     }
     if (isFocused) load();

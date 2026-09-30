@@ -48,7 +48,7 @@ threshold가 달라도 B가 받는 점수는 같은 기준으로 비교·표시�
 
 ## A가 필요한 데이터 형식 (B → A)
 
-JSONL, 한 줄에 한 건. `train.jsonl` / `val.jsonl` / `test.jsonl`을 `data/`에 넣으면 된다.
+JSONL, 한 줄에 한 건. `train.jsonl` / `val.jsonl` / `test.jsonl`을 `backend/dataset/`에 넣으면 된다.
 
 ```json
 {"text": "오늘 발표 때문에 긴장됐지만 끝나고 기분이 좋았다.", "labels": {"joy": 1, "trust": 0, "fear": 1, "surprise": 0, "sadness": 0, "disgust": 0, "anger": 0, "anticipation": 1}}

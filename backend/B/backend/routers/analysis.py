@@ -4,10 +4,10 @@ from database import get_db
 import models
 import datetime
 # [수정] C의 실제 파일인 routine_manager와 analysis_C 분석 함수를 임포트합니다.
-import routine_manager 
-from analysis_C import get_mind_forest_report
+import routine_manager
 from services.emotion_service import get_recent_emotions
 from services.ai_logic import check_anomaly_level
+from services.weekly_report import build_weekly_report
 
 router = APIRouter()
 
@@ -75,22 +75,18 @@ def get_report(user_id: str, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
     
-    # 1. C의 분석 엔진(get_mind_forest_report) 호출
+    # 1. 새 주간 리포트 엔진 호출 (카드별 상태를 따로 내려줍니다)
     try:
-        report_res = get_mind_forest_report(db, user_id)
-        if "error" in report_res:
-            # 일기가 없는 등의 예외 케이스 기본값 처리
-            report_res = {
-                "status": "no_data",
-                "message": "아직 주간 리포트를 분석하기에 일기 데이터가 충분하지 않습니다."
-            }
+        weekly_report = build_weekly_report(db, user_id)
     except Exception as e:
-        print(f"🚨 리포트 분석 엔진 구동 실패: {e}")
-        report_res = {
-            "status": "no_data",
-            "message": f"리포트 생성 실패: {str(e)}"
+        # 서버 오류 문구는 사용자에게 노출하지 않고 로그에만 남깁니다.
+        print(f"🚨 주간 리포트 엔진 구동 실패: {e}")
+        weekly_report = {
+            "status": "error",
+            "message": "리포트를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+            "cards": {}
         }
-    
+
     # 2. 오늘 유저에게 할당된 추천 루틴 조회
     today = datetime.date.today()
     routines = db.query(models.UserRoutine).filter(
@@ -107,6 +103,6 @@ def get_report(user_id: str, db: Session = Depends(get_db)):
         "user_animal": user.user_animal,
         "assigned_category": user.assigned_category,
         "signup_date": signup_date,
-        "weekly_analysis": report_res,
+        "weekly_report": weekly_report,  # 카드 + 상태 구조
         "recommendations": recommendations
     }

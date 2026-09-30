@@ -12,7 +12,7 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer, get_
 from dataset import EmotionDataset, load_jsonl
 from emotion_classifier import BASE_MODEL, EMOTIONS, MODEL_DIR
 
-DATA_DIR = Path(__file__).parent / "data"
+DATA_DIR = Path(__file__).parent.parent / "dataset"
 
 
 def evaluate_loss(model, loader, device) -> float:
