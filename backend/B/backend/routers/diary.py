@@ -7,6 +7,7 @@ import models
 from pydantic import BaseModel
 from typing import List, Any, Optional
 from services.ai_logic import analyze_diary_emotion, check_anomaly_level
+from services.emotion_pipeline import analyze_emotion_pipeline
 from datetime import datetime
 import routine_manager
 
@@ -55,7 +56,7 @@ def update_routine_status(data: RoutineRequest, db: Session = Depends(get_db)):
             func.date(models.Diary.created_at) == target_date
         ).first()
 
-        score_diff_val = 10.0 if data.is_done else 0.0
+        score_diff_val = 0.0
 
         if existing_diary:
             existing_diary.routine_name = data.routine_name
@@ -120,13 +121,14 @@ def create_or_update_diary(data: DiaryRequest, db: Session = Depends(get_db)):
                 "elements": data.elements
             }, ensure_ascii=False)
 
-        # 2. AI 감정 분석 (코멘트 없이 8가지 감정 스코어만 추출)
-        analysis = analyze_diary_emotion(actual_main_text)
+        # 2. AI 감정 분석 (8감정 + 경합 시 BWS 로직 가동)
+        analysis = analyze_emotion_pipeline(actual_main_text)
         if not analysis:
             raise HTTPException(status_code=500, detail="AI 분석 실패")
 
         emotions = analysis.get("emotions", {})
-        analysis_comment = analysis.get("analysis_comment", "")
+        # BWS 코멘트를 feedback 필드에 넣기 위해
+        analysis_comment = analysis.get("bws_validation", {}).get("reasoning", "") if analysis.get("bws_used") else ""
 
         # 3. 데이터베이스에 넣기 (Upsert)
         existing_diary = db.query(models.Diary).filter(
@@ -150,7 +152,7 @@ def create_or_update_diary(data: DiaryRequest, db: Session = Depends(get_db)):
         routine_name = data.routine_name or default_routine_name
         routine_category = data.routine_category or default_routine_category
         is_done = data.is_done or default_is_done
-        score_diff = data.score_diff if data.score_diff > 0 else default_score_diff
+        score_diff = 0.0
 
         if existing_diary:
             # 기존 일기가 있으면 덮어쓰기 (Update)

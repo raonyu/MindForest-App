@@ -42,7 +42,7 @@ const ResizableElement: React.FC<ResizableElementProps> = ({ el, isSelected, onS
 
       {isSelected && (
         <>
-          {/* 💡 확인 버튼: O - 요청하신 파란색 배경에 하얀 글씨로 변경 */}
+          {/* 확인 버튼: O  */}
           <TouchableOpacity style={styles.confirmBtn} onPress={() => onSelect(null)}>
             <Text style={[styles.iconText, { color: 'white' }]}>O</Text>
           </TouchableOpacity>
@@ -52,17 +52,17 @@ const ResizableElement: React.FC<ResizableElementProps> = ({ el, isSelected, onS
             <Text style={[styles.iconText, { color: 'white' }]}>X</Text>
           </TouchableOpacity>
 
-          {/* 확대 버튼 (+) : 시각적 균형을 위해 사이즈 16 적용 */}
+          {/* 확대 버튼 (+) */}
           <TouchableOpacity style={styles.resizeBtn} onPress={() => onUpdate(el.id, { size: el.size + 10 })}>
             <Text style={[styles.iconText, { fontSize: 16 }]}>+</Text>
           </TouchableOpacity>
 
-          {/* 축소 버튼 (-) : 시각적 균형을 위해 사이즈 16 적용 */}
+          {/* 축소 버튼 (-) */}
           <TouchableOpacity style={styles.shrinkBtn} onPress={() => onUpdate(el.id, { size: Math.max(20, el.size - 10) })}>
             <Text style={[styles.iconText, { fontSize: 16 }]}>-</Text>
           </TouchableOpacity>
 
-          {/* 💡 방향키 버튼 바: "리퀴드 글래스" 질감 및 우윳빛 색상 적용 컴포넌트 */}
+          {/* 방향키 버튼 바 */}
           <View style={styles.moveControlBar}>
             <TouchableOpacity style={styles.arrowBtn} onPress={() => onUpdate(el.id, { y: (el.y || 0) - 5 })}>
               <Text style={styles.arrowText}>▲</Text>
@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
     position: 'absolute', 
     top: -10, 
     left: -10, 
-    backgroundColor: '#98cbf1', // 💡 요청하신 파란색 배경
+    backgroundColor: '#98cbf1',
     width: 24, 
     height: 24, 
     borderRadius: 12, 
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     position: 'absolute', 
     bottom: -10, 
     left: -10,
-    backgroundColor: 'white', // 하얀 배경
+    backgroundColor: 'white',
     width: 24, 
     height: 24, 
     borderRadius: 12, 
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
     position: 'absolute', 
     bottom: -10, 
     right: -10,
-    backgroundColor: 'white', // 하얀 배경
+    backgroundColor: 'white', 
     width: 24, 
     height: 24, 
     borderRadius: 12, 
@@ -165,21 +165,20 @@ const styles = StyleSheet.create({
   iconText: { 
     fontFamily: 'Galmuri9',
     color: '#333', 
-    fontSize: 12, // 💡 기본 크기 12px (+, - 버튼은 인라인 스타일로 16px 적용)
+    fontSize: 12,
     includeFontPadding: false,
     textAlignVertical: 'center'
   },
 
-  // 💡 방향키 버튼 바: "리퀴드 글래스" 질감 및 우윳빛 색상 적용
   moveControlBar: {
     flexDirection: 'row',
     position: 'absolute',
     top: '100%',
-    left: '50%', // 중앙 정렬용
-    marginLeft: -66, // 가로 폭(28*4+6*3+4*2)의 절반값
+    left: '50%', 
+    marginLeft: -66, 
     marginTop: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)', // 💡 우윳빛 질감 및 투명도
-    borderRadius: 14, // 💡 더 둥근 모서리
+    backgroundColor: 'rgba(255, 255, 255, 0.9)', 
+    borderRadius: 14, 
     padding: 4,
     gap: 6,
     elevation: 4,
@@ -190,8 +189,8 @@ const styles = StyleSheet.create({
   },
   arrowBtn: {
     padding: 4,
-    backgroundColor: '#EAEAEA', // 회색 네모 배경 (기존 느낌 유지)
-    borderRadius: 8, // 조금 더 둥글게
+    backgroundColor: '#EAEAEA', 
+    borderRadius: 8,
     width: 28,
     height: 28,
     justifyContent: 'center',
@@ -200,7 +199,7 @@ const styles = StyleSheet.create({
   
   arrowText: {
     fontFamily: 'Galmuri9',
-    fontSize: 10, // 화살표 크기 미세 조정
+    fontSize: 10,
     color: '#333',
     includeFontPadding: false,
     textAlignVertical: 'center'
