@@ -117,7 +117,8 @@ const Routines = ({ routines: initialRoutines }: RoutinesProps) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/routines/complete/${routineId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_completed: nextStatus })
       });
       if (!response.ok) throw new Error("루틴 상태 업데이트 실패");
     } catch (error) {
@@ -187,7 +188,7 @@ const MainScreen = () => {
   const requestSurvey = async () => {
     try {
       const surveyType = 'DEPRESSION';
-      const response = await fetch(`${API_BASE_URL}/api/survey/api/survey/${surveyType}`, {
+      const response = await fetch(`${API_BASE_URL}/api/survey/${surveyType}`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
       });

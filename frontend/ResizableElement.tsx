@@ -11,13 +11,18 @@ interface ResizableElementProps {
 }
 
 const ResizableElement: React.FC<ResizableElementProps> = ({ el, isSelected, onSelect, onUpdate, onRemove, zIndex }) => {
+  const startPos = useRef({ x: el.x || 0, y: el.y || 0 });
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        startPos.current = { x: el.x || 0, y: el.y || 0 };
+      },
       onPanResponderMove: (evt, gestureState) => {
         onUpdate(el.id, {
-          x: (el.x || 0) + gestureState.dx,
-          y: (el.y || 0) + gestureState.dy,
+          x: startPos.current.x + gestureState.dx,
+          y: startPos.current.y + gestureState.dy,
         });
       },
       onPanResponderRelease: () => {},

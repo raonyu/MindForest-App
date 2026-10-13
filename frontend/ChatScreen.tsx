@@ -204,8 +204,10 @@ const ChatScreen = () => {
               time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             }));
             setMessages(prev => {
-              // 기존에 추가된 로컬 메시지(예: 설문조사 시작 메시지)가 있다면 유지하고 과거 내역을 앞에 붙임
-              return [...historyMessages, ...prev];
+              // 기존에 추가된 로컬 메시지(예: 설문조사 시작 메시지)가 있다면 유지하고 과거 내역을 앞에 붙임 (중복 방지)
+              const existingIds = new Set(prev.map(m => m.id));
+              const uniqueHistory = historyMessages.filter(m => !existingIds.has(m.id));
+              return [...uniqueHistory, ...prev];
             });
           } else {
             console.log("과거 대화 내역이 없습니다.");
