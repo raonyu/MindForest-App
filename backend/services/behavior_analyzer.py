@@ -14,18 +14,27 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 backend_dir = os.path.dirname(current_dir)
 if backend_dir not in sys.path:
     sys.path.append(backend_dir)
+b_backend_dir = os.path.join(backend_dir, "B", "backend")
+if os.path.exists(b_backend_dir) and b_backend_dir not in sys.path:
+    sys.path.append(b_backend_dir)
 
 # routine_manager 임포트 확인
 try:
     from B.backend.routine_manager import routine_manager
 except ImportError:
-    routine_manager = None
+    try:
+        from routine_manager import routine_manager
+    except ImportError:
+        routine_manager = None
 
 # models.py에서 Diary와 User 모델 모두 가져오기
 try:
     from B.backend.models import Diary, User 
 except ImportError:
-    pass
+    try:
+        from models import Diary, User
+    except ImportError:
+        pass
 
 # 주간 리포트 최소 생성 기준 (analysis_C.py)
 MIN_DIARIES_FOR_REPORT = 3
