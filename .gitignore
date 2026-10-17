@@ -82,3 +82,10 @@ backend/node_modules/
 =======
 .vscode/
 *.pyc
+
+# AI 대용량 모델 가중치 파일 제외 (100MB 제한 방지)
+*.safetensors
+*.bin
+*.pt
+*.pth
+backend/emotion_model/model/model.safetensors
