@@ -23,8 +23,14 @@ interface currentData {
   animal_emoji: string | null;
   animal_description: string | null;
   diagnosis_result?: {
+    survey_type?: string | null;
+    scale_name?: string;
     total_score: number;
     result_message: string;
+    score_delta?: number;
+    trend?: 'improving' | 'worsening' | 'same' | 'initial';
+    tested_at?: string | null;
+    total_test_count?: number;
   };
   today_routines?: routineData[];
   weekly_analysis?: any;
@@ -324,16 +330,8 @@ const MainScreen = () => {
 
         {/* 감정 메시지 알림바 */}
         {emotionMessage?.message && (
-          <View style={[styles.messageAlert, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
-            <Text style={[styles.messageText, { flex: 1 }]}>💡 {user?.diagnosis_result?.result_message || emotionMessage?.message}</Text>
-            {currentUserData?.diagnosis_result?.total_score !== undefined && currentUserData.diagnosis_result.total_score <= 4 && (
-              <TouchableOpacity 
-                style={styles.otherTestButton}
-                onPress={() => setTestListModalVisible(true)}
-              >
-                <Text style={styles.otherTestButtonText}>다른 테스트 진행하기</Text>
-              </TouchableOpacity>
-            )}
+          <View style={styles.messageAlert}>
+            <Text style={styles.messageText}>💡 {emotionMessage.message}</Text>
           </View>
         )}
 
@@ -371,19 +369,113 @@ const MainScreen = () => {
             </View>
           </View>
 
-          {/* 설문조사 메인 버튼 */}
+          {/* 설문조사 메인 버튼 (상시 접근 가능) */}
           {(!currentUserData?.assigned_category && currentUserData?.animal_category !== "조용히 움츠린 거북이") ? (
             <TouchableOpacity style={styles.primaryButton} activeOpacity={0.8} onPress={() => { navigation.navigate("채팅", { initialMessage: "사전 테스트 시작하기" }); }}>
               <Text style={styles.primaryButtonText}>마음의 숲 사전 테스트 진행하기</Text>
             </TouchableOpacity>
           ) : (
             <View style={{ width: '100%', alignItems: 'center' }}>
-              <TouchableOpacity style={styles.primaryButton} activeOpacity={0.8} onPress={() => { navigation.navigate("채팅"); startCategorySurvey(); }}>
-                <Text style={styles.primaryButtonText}>유형별 심화 테스트 진행하기</Text>
+              <TouchableOpacity style={styles.primaryButton} activeOpacity={0.8} onPress={() => setTestListModalVisible(true)}>
+                <Text style={styles.primaryButtonText}>심화 심리 테스트 목록 보기</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
+
+        {/* 심화 테스트 결과 및 상태 변화 추적 전용 카드 */}
+        {currentUserData?.diagnosis_result?.survey_type ? (
+          <View style={styles.diagnosisCard}>
+            <View style={styles.diagnosisCardHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.diagnosisBadge}>📋 {currentUserData.diagnosis_result.scale_name}</Text>
+                {currentUserData.diagnosis_result.tested_at && (
+                  <Text style={styles.diagnosisDate}>최근 검사일: {currentUserData.diagnosis_result.tested_at}</Text>
+                )}
+              </View>
+              <TouchableOpacity 
+                style={styles.retestListButton}
+                onPress={() => setTestListModalVisible(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.retestListButtonText}>전체 척도 ▾</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.diagnosisScoreRow}>
+              <View>
+                <Text style={styles.scoreLabel}>검사 측정 점수</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
+                  <Text style={styles.scoreNumber}>{currentUserData.diagnosis_result.total_score}</Text>
+                  <Text style={styles.scoreUnit}> 점</Text>
+                </View>
+              </View>
+
+              {/* 이전 검사 대비 호전/악화/유지 인디케이터 */}
+              {currentUserData.diagnosis_result.trend && currentUserData.diagnosis_result.trend !== 'initial' ? (
+                <View style={[
+                  styles.trendBadge,
+                  currentUserData.diagnosis_result.trend === 'improving' ? styles.trendBadgeGood :
+                  currentUserData.diagnosis_result.trend === 'worsening' ? styles.trendBadgeBad : styles.trendBadgeSame
+                ]}>
+                  <Text style={[
+                    styles.trendText,
+                    currentUserData.diagnosis_result.trend === 'improving' ? styles.trendTextGood :
+                    currentUserData.diagnosis_result.trend === 'worsening' ? styles.trendTextBad : styles.trendTextSame
+                  ]}>
+                    {currentUserData.diagnosis_result.trend === 'improving'
+                      ? `이전 대비 ▼ ${Math.abs(currentUserData.diagnosis_result.score_delta || 0)}점 (호전 👏)`
+                      : currentUserData.diagnosis_result.trend === 'worsening'
+                      ? `이전 대비 ▲ ${Math.abs(currentUserData.diagnosis_result.score_delta || 0)}점 (주의 ⚠️)`
+                      : '이전 대비 ― 점수 유지'}
+                  </Text>
+                </View>
+              ) : (
+                <View style={[styles.trendBadge, styles.trendBadgeSame]}>
+                  <Text style={[styles.trendText, styles.trendTextSame]}>첫 진단 완료 🌱</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.diagnosisMessageBox}>
+              <Text style={styles.diagnosisMessageText}>
+                {currentUserData.diagnosis_result.result_message}
+              </Text>
+            </View>
+
+            {/* 재검사 및 다른 유형 검사 버튼 */}
+            <View style={styles.diagnosisActionRow}>
+              <TouchableOpacity 
+                style={styles.actionBtnSecondary}
+                onPress={() => startCategorySurvey(currentUserData.diagnosis_result?.survey_type || undefined)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.actionBtnSecondaryText}>🔄 다시 진단받기</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.actionBtnPrimary}
+                onPress={() => setTestListModalVisible(true)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.actionBtnPrimaryText}>다른 질환 검사하기</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.diagnosisEmptyCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.diagnosisEmptyTitle}>심층 심리 진단</Text>
+              <Text style={styles.diagnosisEmptyDesc}>나의 마음 상태를 9대 질환 척도로 점검해보세요.</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.startTestSmallBtn}
+              onPress={() => setTestListModalVisible(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.startTestSmallBtnText}>검사 시작</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* 리포트 진입 버튼 */}
         <TouchableOpacity style={styles.reportCard} activeOpacity={0.8} onPress={() => setReportModalVisible(true)}>
@@ -722,6 +814,182 @@ const styles = StyleSheet.create({
   modalCloseButtonText: {
     color: '#636e72',
     fontSize: 14,
+    fontWeight: 'bold',
+    fontFamily: 'NanumSquareRoundB',
+  },
+  // 심화 테스트 결과 카드 스타일
+  diagnosisCard: {
+    width: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#8c7ae6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 3,
+  },
+  diagnosisCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  diagnosisBadge: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#4b6584',
+    fontFamily: 'NanumSquareRoundB',
+  },
+  diagnosisDate: {
+    fontSize: 11,
+    color: '#a4b0be',
+    fontFamily: 'NanumSquareRoundR',
+    marginTop: 2,
+  },
+  retestListButton: {
+    backgroundColor: '#f1f2f6',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  retestListButtonText: {
+    fontSize: 12,
+    color: '#57606f',
+    fontFamily: 'NanumSquareRoundB',
+  },
+  diagnosisScoreRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f2f6',
+  },
+  scoreLabel: {
+    fontSize: 12,
+    color: '#747d8c',
+    fontFamily: 'NanumSquareRoundR',
+  },
+  scoreNumber: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#2f3542',
+    fontFamily: 'NanumSquareRoundB',
+  },
+  scoreUnit: {
+    fontSize: 16,
+    color: '#747d8c',
+    fontFamily: 'NanumSquareRoundR',
+  },
+  trendBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  trendBadgeGood: {
+    backgroundColor: '#e4f1e9',
+  },
+  trendBadgeBad: {
+    backgroundColor: '#ffeaa7',
+  },
+  trendBadgeSame: {
+    backgroundColor: '#f1f2f6',
+  },
+  trendText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    fontFamily: 'NanumSquareRoundB',
+  },
+  trendTextGood: {
+    color: '#20bf6b',
+  },
+  trendTextBad: {
+    color: '#d35400',
+  },
+  trendTextSame: {
+    color: '#747d8c',
+  },
+  diagnosisMessageBox: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 14,
+    padding: 12,
+    marginVertical: 12,
+  },
+  diagnosisMessageText: {
+    fontSize: 13,
+    color: '#47535E',
+    fontFamily: 'NanumSquareRoundR',
+    lineHeight: 18,
+  },
+  diagnosisActionRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  actionBtnSecondary: {
+    flex: 1,
+    backgroundColor: '#f1f2f6',
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  actionBtnSecondaryText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#57606f',
+    fontFamily: 'NanumSquareRoundB',
+  },
+  actionBtnPrimary: {
+    flex: 1,
+    backgroundColor: '#8c7ae6',
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: 'center',
+  },
+  actionBtnPrimaryText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    fontFamily: 'NanumSquareRoundB',
+  },
+  diagnosisEmptyCard: {
+    width: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+  },
+  diagnosisEmptyTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#2f3542',
+    fontFamily: 'NanumSquareRoundB',
+  },
+  diagnosisEmptyDesc: {
+    fontSize: 12,
+    color: '#747d8c',
+    fontFamily: 'NanumSquareRoundR',
+    marginTop: 2,
+  },
+  startTestSmallBtn: {
+    backgroundColor: '#8c7ae6',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+  },
+  startTestSmallBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
     fontWeight: 'bold',
     fontFamily: 'NanumSquareRoundB',
   },

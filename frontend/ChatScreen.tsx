@@ -91,37 +91,33 @@ const ChatScreen = () => {
   const [surveyResult, setSurveyResult] = useState<SurveyResult | null>(null);
   const [inputText, setInputText] = useState<string>('');
   const [modalVisible, setModalVisible] = useState(false);
-  const { user } = useMainContext();
+  const { user, setUser } = useMainContext();
+  const isAtBottomRef = useRef(true);
 
-  // 페이징 (스크롤 긴 현상 방지)
-  const [maxMessages, setMaxMessages] = useState(15);
-  const prevMsgLength = useRef(0);
-
-  // 화면이 다시 포커스될 때 렌더링 메시지 수를 초기화하여 렉을 방지합니다.
+  // 프로필 정보가 Context에 비어있을 경우 자동 동기화
   useEffect(() => {
-    if (isFocused) {
-      setMaxMessages(15);
+    if (user?.user_id && (!user?.animal_category || !user?.animal_emoji)) {
+      const fetchProfile = async () => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/user/profile/${user.user_id}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (setUser) setUser((prev: any) => ({ ...prev, ...data }));
+          }
+        } catch (e) {
+          console.log("채팅 화면 프로필 조회 실패:", e);
+        }
+      };
+      fetchProfile();
     }
-  }, [isFocused]);
-
-  useEffect(() => {
-    const diff = messages.length - prevMsgLength.current;
-    if (diff > 0 && prevMsgLength.current > 0) {
-      if (diff < 10) { 
-        setMaxMessages(prev => prev + diff);
-      }
-    }
-    prevMsgLength.current = messages.length;
-  }, [messages.length]);
+  }, [user?.user_id, isFocused]);
 
   const handleScroll = (event: any) => {
-    const offsetY = event.nativeEvent.contentOffset.y;
-    if (offsetY <= 100 && maxMessages < messages.length) {
-      setMaxMessages(prev => Math.min(prev + 15, messages.length));
-    }
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const paddingToBottom = 80;
+    const isBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+    isAtBottomRef.current = isBottom;
   };
-
-  const displayedMessages = messages.slice(Math.max(0, messages.length - maxMessages));
 
   // 설문조사 모드 관련 상태
   const [surveyMode, setSurveyMode] = useState(false);
@@ -228,6 +224,7 @@ const ChatScreen = () => {
 
   //백앤드 메세지 요청/응답 함수
   const handleSendMessage = async (inputText: string) => {
+    isAtBottomRef.current = true;
     //유저 메세지 보내기
     const userMsg: Message = {
       id: Date.now().toString() + '_user',
@@ -436,9 +433,9 @@ const ChatScreen = () => {
     };
   }, []);
 
-  // 새 메시지 추가 시 자동 스크롤
+  // 새 메시지 추가 시 사용자가 바닥에 머무를 때만 자동 스크롤
   useEffect(() => {
-    if (flatListRef.current) {
+    if (flatListRef.current && isAtBottomRef.current) {
       try {
         // @ts-ignore
         flatListRef.current.scrollToEnd({ animated: true });
@@ -536,9 +533,17 @@ const ChatScreen = () => {
   //최종 스크린 보여주기
   return (
     <View style={styles.container}>
-      <Text style={styles.screenTitle}>채팅 화면</Text>
+      <View style={styles.chatHeader}>
+        <Text style={styles.screenTitle}>
+          {user?.animal_emoji ? `${user.animal_emoji} ` : '🌲 '}
+          {user?.animal_category ? `${user.animal_category} 상담소` : '마음의 숲 챗봇'}
+        </Text>
+        <Text style={styles.screenSubtitle}>
+          {user?.user_id ? `${user.user_id}님을 위한 따뜻한 공감 상담` : '당신의 이야기에 귀 기울입니다'}
+        </Text>
+      </View>
       <FlatList<Message>
-        data={displayedMessages}
+        data={messages}
         renderItem={renderMessages}
         keyExtractor={item => item.id}
         style={styles.list}
@@ -547,6 +552,9 @@ const ChatScreen = () => {
         keyboardDismissMode="interactive"
         onScroll={handleScroll}
         scrollEventThrottle={16}
+        initialNumToRender={20}
+        maxToRenderPerBatch={15}
+        windowSize={11}
         ref={(ref) => { /* @ts-ignore */ flatListRef.current = ref }}
       />
       <ResultModal isVisible={modalVisible} data={surveyResult} onClose={() => setModalVisible(false)} />
@@ -562,11 +570,25 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingBottom: 100, // 하단바가 고정일 때 내용이 가려지지 않도록 여유를 둠
   },
+  chatHeader: {
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    paddingBottom: 10,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f3eb',
+  },
   screenTitle: {
-    fontSize: 14,
-    color: '#333',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2a3a21',
+    fontFamily: 'NanumSquareRoundB',
+  },
+  screenSubtitle: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    marginTop: 2,
+    fontFamily: 'NanumSquareRoundR',
   },
   list: {
     flex: 1,
