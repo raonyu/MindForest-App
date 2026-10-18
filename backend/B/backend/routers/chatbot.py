@@ -47,6 +47,7 @@ def chat(data: ChatRequest, db: Session = Depends(get_db)):
         user_animal=user.user_animal or "",   # [수정] 누락된 인수 추가
         signup_date=user.created_at,            # [수정] 누락된 인수 추가
         user_state=state_summary,               # [수정] 현재 사용자 상태 주입
+        user_id=user.id                         # 사용자 ID 주입 (개인화 호칭 및 인식)
     )
 
     # 3. 유저 메시지 저장

@@ -100,11 +100,43 @@ def get_user_profile(user_id: str, db: Session = Depends(get_db)):
         models.Animal.category == user.assigned_category
     ).first()
 
-    # 2. 전문 진단 결과 조회
-    latest_survey = db.query(models.SurveyResult).filter(
-        models.SurveyResult.user_id == user_id,
-        models.SurveyResult.survey_type == user.assigned_category
-    ).order_by(models.SurveyResult.created_at.desc()).first()
+    # 2. 전문 진단 결과 조회 (다회차 이력 및 점수 변화 추적)
+    SURVEY_SCALE_MAP = {
+        "DEPRESSION": "우울 선별 척도 (PHQ-9)",
+        "ANXIETY": "불안 선별 척도 (GAD-7)",
+        "ADHD": "성인 ADHD 척도 (ASRS)",
+        "BIPOLAR": "양극성 장애 척도 (K-MDQ)",
+        "PTSD": "외상 후 스트레스 척도 (PCL-5)",
+        "OCD": "강박 장애 척도 (Y-BOCS)",
+        "SCHIZOPHRENIA": "조현병 초기 척도 (PRIME)",
+        "EATING_DISORDER": "식이장애 척도 (EAT-26)",
+        "ANGER": "분노 척도 (DAR-5)"
+    }
+
+    survey_query = db.query(models.SurveyResult).filter(models.SurveyResult.user_id == user_id)
+    if user.assigned_category:
+        category_surveys = survey_query.filter(
+            models.SurveyResult.survey_type == user.assigned_category
+        ).order_by(models.SurveyResult.created_at.desc()).limit(2).all()
+        surveys = category_surveys if category_surveys else survey_query.order_by(models.SurveyResult.created_at.desc()).limit(2).all()
+    else:
+        surveys = survey_query.order_by(models.SurveyResult.created_at.desc()).limit(2).all()
+
+    latest_survey = surveys[0] if len(surveys) > 0 else None
+    previous_survey = surveys[1] if len(surveys) > 1 else None
+
+    score_delta = 0
+    trend = "initial"
+    if latest_survey and previous_survey:
+        score_delta = latest_survey.score - previous_survey.score
+        if score_delta < 0:
+            trend = "improving"   # 점수 하락 = 호전
+        elif score_delta > 0:
+            trend = "worsening"   # 점수 상승 = 주의/악화
+        else:
+            trend = "same"        # 점수 동일 = 유지
+
+    total_test_count = db.query(models.SurveyResult).filter(models.SurveyResult.user_id == user_id).count()
 
     # 3. 오늘 할당된 루틴 조회
     today = datetime.date.today()
@@ -129,8 +161,14 @@ def get_user_profile(user_id: str, db: Session = Depends(get_db)):
         "animal_emoji": animal_info.emoji if animal_info else "🐾",
         "animal_description": animal_info.description if animal_info else "분석 완료",
         "diagnosis_result": {
+            "survey_type": latest_survey.survey_type if latest_survey else None,
+            "scale_name": SURVEY_SCALE_MAP.get(latest_survey.survey_type, f"{latest_survey.survey_type} 심화 검사") if latest_survey else "심화 검사 미진행",
             "total_score": latest_survey.score if latest_survey else 0,
-            "result_message": latest_survey.result_message if latest_survey else "기록 없음"
+            "result_message": latest_survey.result_message if latest_survey else "기록 없음",
+            "score_delta": score_delta,
+            "trend": trend,
+            "tested_at": latest_survey.created_at.strftime("%Y-%m-%d") if (latest_survey and latest_survey.created_at) else None,
+            "total_test_count": total_test_count
         },
         "today_routines": routine_list  # [수정] 3개가 모두 담겨서 나갑니다.
     }
