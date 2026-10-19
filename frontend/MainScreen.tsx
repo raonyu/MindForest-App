@@ -369,38 +369,24 @@ const MainScreen = () => {
             </View>
           </View>
 
-          {/* 설문조사 메인 버튼 (상시 접근 가능) */}
-          {(!currentUserData?.assigned_category && currentUserData?.animal_category !== "조용히 움츠린 거북이") ? (
+          {/* 사전 테스트 전에는 온보딩 버튼만 노출 */}
+          {(!currentUserData?.assigned_category && currentUserData?.animal_category !== "조용히 움츠린 거북이") && (
             <TouchableOpacity style={styles.primaryButton} activeOpacity={0.8} onPress={() => { navigation.navigate("채팅", { initialMessage: "사전 테스트 시작하기" }); }}>
               <Text style={styles.primaryButtonText}>마음의 숲 사전 테스트 진행하기</Text>
             </TouchableOpacity>
-          ) : (
-            <View style={{ width: '100%', alignItems: 'center' }}>
-              <TouchableOpacity style={styles.primaryButton} activeOpacity={0.8} onPress={() => setTestListModalVisible(true)}>
-                <Text style={styles.primaryButtonText}>심화 심리 테스트 목록 보기</Text>
-              </TouchableOpacity>
-            </View>
           )}
-        </View>
 
-        {/* 심화 테스트 결과 및 상태 변화 추적 전용 카드 */}
-        {currentUserData?.diagnosis_result?.survey_type ? (
-          <View style={styles.diagnosisCard}>
-            <View style={styles.diagnosisCardHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.diagnosisBadge}>📋 {currentUserData.diagnosis_result.scale_name}</Text>
-                {currentUserData.diagnosis_result.tested_at && (
-                  <Text style={styles.diagnosisDate}>최근 검사일: {currentUserData.diagnosis_result.tested_at}</Text>
-                )}
+          {/* 심화 테스트 결과를 같은 카드 안에서 이어서 보여줍니다. */}
+          {currentUserData?.diagnosis_result?.survey_type ? (
+            <View style={styles.cardDivider}>
+              <View style={styles.diagnosisCardHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.diagnosisBadge}>📋 {currentUserData.diagnosis_result.scale_name}</Text>
+                  {currentUserData.diagnosis_result.tested_at && (
+                    <Text style={styles.diagnosisDate}>최근 검사일: {currentUserData.diagnosis_result.tested_at}</Text>
+                  )}
+                </View>
               </View>
-              <TouchableOpacity 
-                style={styles.retestListButton}
-                onPress={() => setTestListModalVisible(true)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.retestListButtonText}>전체 척도 ▾</Text>
-              </TouchableOpacity>
-            </View>
 
             <View style={styles.diagnosisScoreRow}>
               <View>
@@ -443,39 +429,40 @@ const MainScreen = () => {
               </Text>
             </View>
 
-            {/* 재검사 및 다른 유형 검사 버튼 */}
-            <View style={styles.diagnosisActionRow}>
-              <TouchableOpacity 
-                style={styles.actionBtnSecondary}
-                onPress={() => startCategorySurvey(currentUserData.diagnosis_result?.survey_type || undefined)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.actionBtnSecondaryText}>🔄 다시 진단받기</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.actionBtnPrimary}
-                onPress={() => setTestListModalVisible(true)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.actionBtnPrimaryText}>다른 질환 검사하기</Text>
-              </TouchableOpacity>
+              {/* 재검사 및 다른 유형 검사 버튼 */}
+              <View style={styles.diagnosisActionRow}>
+                <TouchableOpacity
+                  style={styles.actionBtnSecondary}
+                  onPress={() => startCategorySurvey(currentUserData.diagnosis_result?.survey_type || undefined)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.actionBtnSecondaryText}>🔄 다시 진단받기</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionBtnPrimary}
+                  onPress={() => setTestListModalVisible(true)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.actionBtnPrimaryText}>다른 질환 검사하기</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        ) : (
-          <View style={styles.diagnosisEmptyCard}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.diagnosisEmptyTitle}>심층 심리 진단</Text>
-              <Text style={styles.diagnosisEmptyDesc}>나의 마음 상태를 9대 질환 척도로 점검해보세요.</Text>
-            </View>
-            <TouchableOpacity 
-              style={styles.startTestSmallBtn}
-              onPress={() => setTestListModalVisible(true)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.startTestSmallBtnText}>검사 시작</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+          ) : (
+            currentUserData?.assigned_category ? (
+              <View style={styles.cardDivider}>
+                <Text style={styles.diagnosisEmptyTitle}>심층 심리 진단</Text>
+                <Text style={styles.diagnosisEmptyDesc}>나의 마음 상태를 9대 질환 척도로 점검해보세요.</Text>
+                <TouchableOpacity
+                  style={[styles.primaryButton, { marginTop: 14 }]}
+                  onPress={() => setTestListModalVisible(true)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.primaryButtonText}>심화 심리 테스트 시작하기</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null
+          )}
+        </View>
 
         {/* 리포트 진입 버튼 */}
         <TouchableOpacity style={styles.reportCard} activeOpacity={0.8} onPress={() => setReportModalVisible(true)}>
@@ -576,6 +563,13 @@ const styles = StyleSheet.create({
   },
   mainCardContent: {
     marginBottom: 24,
+  },
+  // 동물 카드 안에서 진단 결과 영역을 구분하는 선
+  cardDivider: {
+    borderTopWidth: 1,
+    borderTopColor: '#f1f2f6',
+    paddingTop: 20,
+    marginTop: 4,
   },
   animalCenter: {
     alignItems: 'center',
