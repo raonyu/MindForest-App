@@ -38,7 +38,18 @@ EMOTION_EMOJI = {
     "joy": "😊", "trust": "🤝", "anticipation": "⏳", "surprise": "😲",
     "sadness": "😢", "anger": "😡", "fear": "😨", "disgust": "😖",
 }
-SURVEY_LABELS = {"DEPRESSION": "우울", "ANXIETY": "불안", "ADHD": "ADHD"}
+# 9대 질환 코드 → 화면에 보여줄 한글 이름
+SURVEY_LABELS = {
+    "DEPRESSION": "우울",
+    "ANXIETY": "불안",
+    "ADHD": "ADHD",
+    "BIPOLAR": "양극성 장애",
+    "PTSD": "외상 후 스트레스",
+    "OCD": "강박",
+    "SCHIZOPHRENIA": "조현병 초기",
+    "EATING_DISORDER": "식이장애",
+    "ANGER": "분노",
+}
 
 # --- 카드 상태 -------------------------------------------------------------
 READY = "ready"
@@ -324,7 +335,8 @@ def _survey_card(db: Session, user_id: str, assigned_category: str | None) -> di
         READY,
         data={
             "survey_type": survey_type,
-            "label": SURVEY_LABELS.get(survey_type, survey_type or "검사"),
+            # 매핑에 없는 코드가 들어와도 화면에 코드값이 그대로 노출되지 않도록 합니다.
+            "label": SURVEY_LABELS.get(survey_type, "자가검사"),
             "latest": {
                 "score": latest.score,
                 "date": _aware(latest.created_at).date().isoformat(),
