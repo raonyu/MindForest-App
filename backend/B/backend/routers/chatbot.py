@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 # [수정] 임포트 경로를 명확히 하고 중복 임포트를 제거합니다.
 from services.chatbot_logic import get_chat_response 
 from services.user_state_logic import analyze_user_state, build_chat_state_summary  # [수정] 사용자 상태 분석 함수 임포트
+from services.weekly_report import build_chat_report_summary  # 주간 리포트 수치를 상담에 활용
 from routine_manager import routine_manager  # 이 부분이 핵심입니다!
 import models
 from pydantic import BaseModel
@@ -32,12 +33,19 @@ def chat(data: ChatRequest, db: Session = Depends(get_db)):
 
     # 2. [수정] 상담 모드에서만 사용자 상태 분석 실행
     state_summary = None
+    report_summary = None
     if user.is_onboarding_done:
         try:
             user_state = analyze_user_state(db, user_id)
             state_summary = build_chat_state_summary(user_state)
         except Exception as e:
             print(f"사용자 상태 분석 오류: {e}")
+
+        # 주간 리포트 수치(마음 온도, 날짜별 기록, 루틴 효과 등)를 상담 근거로 함께 전달
+        try:
+            report_summary = build_chat_report_summary(db, user_id)
+        except Exception as e:
+            print(f"리포트 요약 오류: {e}")
 
     # 3. AI 호출 (chatbot_logic.py 실행)
     ai_res = get_chat_response(
@@ -47,6 +55,7 @@ def chat(data: ChatRequest, db: Session = Depends(get_db)):
         user_animal=user.user_animal or "",   # [수정] 누락된 인수 추가
         signup_date=user.created_at,            # [수정] 누락된 인수 추가
         user_state=state_summary,               # [수정] 현재 사용자 상태 주입
+        report_summary=report_summary,          # 주간 리포트 수치 주입
         user_id=user.id                         # 사용자 ID 주입 (개인화 호칭 및 인식)
     )
 

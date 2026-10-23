@@ -244,7 +244,7 @@ def analyze_onboarding_answers(answers):
     }
 
 
-def get_chat_response(user_message, chat_history=None, is_onboarding_done=False, user_animal="", signup_date=None, user_state=None, user_id=""):
+def get_chat_response(user_message, chat_history=None, is_onboarding_done=False, user_animal="", signup_date=None, user_state=None, user_id="", report_summary=None):
     """
     마음의 숲 챗봇 엔진
     - Onboarding: 정해진 20문항을 순차적으로 제공
@@ -304,8 +304,18 @@ def get_chat_response(user_message, chat_history=None, is_onboarding_done=False,
 - 최근 7일 긍정 감정 평균: {seven.get("positive_avg", "N/A")}
 - 감정 추세: {seven.get("emotion_trend", "유지")}
 - 부정적 감정 지속 기간: {seven.get("consecutive_negative_days", 0)}일
+- 최근 7일 마음 온도 평균: {seven.get("mind_temperature_avg", "N/A")}점
+- 마음 온도 변화(지난주 대비): {seven.get("mind_temperature_change", 0)}점
 - 자가점검({survey.get("scale_name", "없음")}): {survey.get("score", "기록 없음")}점{delta_str}
 - 주요 분석 근거: {"; ".join(reasons) if reasons else "없음"}
+"""
+
+        # 주간 리포트 수치(날짜별 마음 온도, 루틴 효과 등)를 근거로 함께 제공
+        report_block = ""
+        if report_summary:
+            report_block = f"""
+[주간 리포트 분석 결과 - 사용자가 수치나 특정 날짜를 물으면 아래 값으로 답해줘]
+{report_summary}
 """
 
         user_name = user_id if user_id else "사용자"
@@ -318,8 +328,14 @@ def get_chat_response(user_message, chat_history=None, is_onboarding_done=False,
         [기본 정보]
         - {user_name}님이 우리 숲에 머문 지 {days_since_signup}일째야.
         - 사용자의 유형({animal_desc})과 성향에 맞춰 따뜻하게 공감하고 격려해줘.
-        - 사용자가 자신의 감정을 편안하게 털어놓을 수 있도록 경청하고, 대화 중간에 오늘의 기분이나 마음 온도를 다정하게 물어봐줘.
+        - 사용자가 자신의 감정을 편안하게 털어놓을 수 있도록 경청해줘.
+
+        [답변 규칙]
+        - 사용자가 자기 수치(마음 온도, 감정 점수, 검사 점수)나 특정 날짜의 상태를 물으면, 아래 데이터에서 찾아 숫자와 함께 먼저 답해줘. 되묻지 마.
+        - 아래 데이터에 없는 내용이면 "아직 기록이 없어서 모르겠어요"라고 솔직히 말하고 그때만 되물어줘.
+        - 직전 대화에서 이미 물어본 것은 다시 묻지 마.
         {state_block}
+        {report_block}
         """
         
         try:

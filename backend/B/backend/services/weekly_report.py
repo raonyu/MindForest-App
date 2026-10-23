@@ -599,3 +599,97 @@ def build_weekly_report(db: Session, user_id: str) -> dict:
         "card_status": {key: card["status"] for key, card in cards.items()},
         "cards": cards,
     }
+
+
+# --- 챗봇용 요약 ---------------------------------------------------------------
+def build_chat_report_summary(db: Session, user_id: str) -> str | None:
+    """주간 리포트를 챗봇 프롬프트에 넣을 수 있는 텍스트로 요약합니다.
+
+    챗봇이 "내 마음 온도 어때?", "21일에 기분 어땠어?" 같은 질문에
+    실제 수치로 답할 수 있도록 날짜별 기록까지 포함합니다.
+    """
+    try:
+        report = build_weekly_report(db, user_id)
+    except Exception as e:
+        print(f"[CHAT] 리포트 요약 실패: {e}")
+        return None
+
+    if report.get("status") != "ok":
+        return None
+
+    cards = report.get("cards") or {}
+    lines: list[str] = []
+
+    consistency = report.get("consistency") or {}
+    lines.append(
+        f"- 기록 현황: 최근 {consistency.get('days_total', 7)}일 중 {consistency.get('days_recorded', 0)}일 기록"
+    )
+
+    # 마음 온도 (평균 + 날짜별)
+    trend = cards.get("trend", {}).get("data")
+    if trend:
+        lines.append(f"- 최근 7일 마음 온도 평균: {trend['current_avg']}점 (0~100, 높을수록 안정)")
+        comparison = trend.get("comparison")
+        if comparison:
+            direction = {"up": "상승", "down": "하락", "flat": "변화 없음"}.get(comparison["direction"], "")
+            lines.append(f"- 지난주 대비: {comparison['delta']}점 {direction}")
+        points = ", ".join(f"{p['date'][5:]} {p['value']}점" for p in trend.get("points", []))
+        if points:
+            lines.append(f"- 날짜별 마음 온도: {points}")
+
+    # 감정 스펙트럼
+    spectrum = cards.get("spectrum", {}).get("data")
+    if spectrum:
+        top = " / ".join(f"{e['label']} {e['score']}점" for e in spectrum.get("top3", []))
+        lines.append(f"- 이번 주 두드러진 감정: {top}")
+
+    # 평소 대비
+    baseline = cards.get("baseline", {}).get("data")
+    if baseline:
+        diffs = []
+        for item in baseline.get("comparisons", [])[:3]:
+            direction = "높음" if item["direction"] == "up" else "낮음" if item["direction"] == "down" else "비슷"
+            diffs.append(f"{item['label']} {item['delta']}점 {direction}")
+        if diffs:
+            lines.append(f"- 평소(개인 기준선) 대비: {', '.join(diffs)}")
+
+    # 검사 점수
+    survey = cards.get("survey_trend", {}).get("data")
+    if survey and survey.get("latest"):
+        delta_text = ""
+        if survey.get("direction") in ("up", "down"):
+            delta_text = f" (이전 대비 {survey['delta']}점 {'상승' if survey['direction'] == 'up' else '하락'})"
+        lines.append(f"- {survey['label']} 자가검사: {survey['latest']['score']}점{delta_text}")
+
+    # 회복 탄력성
+    resilience = cards.get("resilience", {}).get("data")
+    if resilience and resilience.get("drop_count"):
+        lines.append(
+            f"- 최근 2주 급격한 하락 {resilience['drop_count']}회 중 {resilience['recovered_count']}회 회복"
+        )
+
+    # 루틴 효과
+    routine = cards.get("routine_effect", {}).get("data")
+    if routine and routine.get("items"):
+        best = routine["items"][0]
+        lines.append(
+            f"- 루틴 '{best['routine']}' 수행일 평균 {best['average']}점 "
+            f"(루틴 없는 날 평균 {routine['baseline_average']}점, 기록 {best['records']}회)"
+        )
+
+    # 복합 감정 데이
+    composite = cards.get("composite_days", {}).get("data")
+    if composite and composite.get("days"):
+        days = ", ".join(
+            f"{d['date'][5:]}({'·'.join(c['label'] for c in d['candidates'])})"
+            for d in composite["days"][:3]
+        )
+        lines.append(f"- 감정이 복합적으로 나타난 날: {days}")
+
+    # 상황 키워드
+    keywords = cards.get("keywords", {}).get("data")
+    if keywords and keywords.get("items"):
+        pairs = ", ".join(f"{i['keyword']}→{i['label']}" for i in keywords["items"][:4])
+        lines.append(f"- 자주 함께 나타난 상황과 감정: {pairs}")
+
+    return "\n".join(lines) if lines else None
