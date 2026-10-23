@@ -138,12 +138,8 @@ def get_user_profile(user_id: str, db: Session = Depends(get_db)):
 
     total_test_count = db.query(models.SurveyResult).filter(models.SurveyResult.user_id == user_id).count()
 
-    # 3. 오늘 할당된 루틴 조회
-    today = datetime.date.today()
-    routines = db.query(models.UserRoutine).filter(
-        models.UserRoutine.user_id == user_id, 
-        models.UserRoutine.date == today
-    ).all()
+    # 3. 오늘 할당된 루틴 조회 (없으면 유형에 맞춰 자동 배정)
+    routines = routine_manager.routine_manager.get_daily_recommendations(db, user_id)
 
     routine_list = []
     for r in routines:

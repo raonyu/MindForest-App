@@ -66,7 +66,7 @@ class RoutineManager:
         ).all()
 
         if not available_routines:
-            print(f"⚠️ [ROUTINE] '{category}'에 매핑된 C 루틴 마스터 데이터가 없습니다.")
+            print(f"[ROUTINE][경고] '{category}'에 매핑된 C 루틴 마스터 데이터가 없습니다.")
             return
 
         selected = []
@@ -97,12 +97,32 @@ class RoutineManager:
         
         try:
             db.commit()
-            print(f"✅ {user_id}님에게 루틴 {len(selected)}개 할당 완료")
+            print(f"[ROUTINE] {user_id}님에게 루틴 {len(selected)}개 할당 완료")
         except Exception as e:
             db.rollback()
-            print(f"❌ 루틴 저장 오류: {e}")
+            print(f"[ROUTINE][오류] 루틴 저장 실패: {e}")
 
     def get_daily_recommendations(self, db: Session, user_id: str):
+        """오늘 할당된 루틴을 돌려줍니다.
+
+        루틴은 온보딩 때 하루치만 만들어지므로, 날짜가 바뀌면 비어 있게 됩니다.
+        조회 시점에 오늘 치가 없으면 사용자 유형에 맞춰 그 자리에서 만들어 줍니다.
+        """
+        routines = db.query(models.UserRoutine).filter(
+            models.UserRoutine.user_id == user_id,
+            models.UserRoutine.date == date.today()
+        ).all()
+
+        if routines:
+            return routines
+
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if not user or not user.assigned_category:
+            # 아직 유형이 정해지지 않은 사용자는 배정할 기준이 없습니다.
+            return []
+
+        self.initialize_user_routine(db, user_id, user.assigned_category)
+
         return db.query(models.UserRoutine).filter(
             models.UserRoutine.user_id == user_id,
             models.UserRoutine.date == date.today()
