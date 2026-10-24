@@ -45,14 +45,16 @@ const BottomBar = () => {
   }, [content]);
 
   // 키보드 이벤트로 바 위치 보정
+  // 안드로이드는 매니페스트의 adjustResize 덕분에 화면 자체가 키보드 위로 줄어듭니다.
+  // 여기서 또 올리면 키보드 높이만큼 두 번 밀려 입력창이 화면 위로 날아가므로, iOS에서만 보정합니다.
   useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, (e: any) => {
+    if (Platform.OS !== 'ios') return;
+
+    const showSub = Keyboard.addListener('keyboardWillShow', (e: any) => {
       const h = e.endCoordinates ? e.endCoordinates.height : 300;
       Animated.timing(keyboardAnim, { toValue: -h, duration: 200, useNativeDriver: true }).start();
     });
-    const hideSub = Keyboard.addListener(hideEvent, () => {
+    const hideSub = Keyboard.addListener('keyboardWillHide', () => {
       Animated.timing(keyboardAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
     });
     return () => { showSub.remove(); hideSub.remove(); };

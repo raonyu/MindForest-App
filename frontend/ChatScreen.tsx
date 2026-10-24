@@ -421,16 +421,31 @@ const ChatScreen = () => {
 
   // 키보드 이벤트: 키보드가 열리면 FlatList가 위로 올라가도록 패딩 조정
   useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, (e: any) => {
+    // 안드로이드는 adjustResize로 화면이 이미 줄어들기 때문에 여백을 더 주면 두 번 밀립니다.
+    if (Platform.OS !== 'ios') return;
+
+    const showSub = Keyboard.addListener('keyboardWillShow', (e: any) => {
       setKeyboardHeight(e.endCoordinates ? e.endCoordinates.height : 300);
     });
-    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    const hideSub = Keyboard.addListener('keyboardWillHide', () => setKeyboardHeight(0));
     return () => {
       showSub.remove();
       hideSub.remove();
     };
+  }, []);
+
+  // 안드로이드: 화면이 줄어들 때 보던 위치가 가려지지 않도록 바닥으로 맞춰줍니다.
+  useEffect(() => {
+    if (Platform.OS === 'ios') return;
+
+    const showSub = Keyboard.addListener('keyboardDidShow', () => {
+      if (!flatListRef.current || !isAtBottomRef.current) return;
+      try {
+        // @ts-ignore
+        flatListRef.current.scrollToEnd({ animated: true });
+      } catch (e) {/* ignore */ }
+    });
+    return () => showSub.remove();
   }, []);
 
   // 새 메시지 추가 시 사용자가 바닥에 머무를 때만 자동 스크롤

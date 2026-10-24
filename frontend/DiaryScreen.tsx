@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, Text, StyleSheet, TouchableOpacity, 
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View, Text, StyleSheet, TouchableOpacity,
   TextInput, Platform, ScrollView, Alert, Image, Dimensions,
-  ImageBackground, Keyboard, Modal
+  ImageBackground, Keyboard, Modal, Animated
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker'; 
 import { useMainContext } from './MainContext';
@@ -33,6 +33,39 @@ const DiaryScreen = () => {
   const [selectedDate, setSelectedDate] = useState<number | null>(isCurrentMonth ? realToday.getDate() : null);
   
   const [isEmotionModalVisible, setIsEmotionModalVisible] = useState<boolean>(false);
+
+  // 감정 선택 시트: 시트는 아래에서 올라오고, 어두운 배경은 투명도로만 나타나게 한다.
+  const SHEET_TRAVEL = 360;
+  const [isSheetMounted, setIsSheetMounted] = useState<boolean>(false);
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const sheetTranslateY = useRef(new Animated.Value(SHEET_TRAVEL)).current;
+
+  useEffect(() => {
+    if (isEmotionModalVisible) {
+      setIsSheetMounted(true);
+      backdropOpacity.setValue(0);
+      sheetTranslateY.setValue(SHEET_TRAVEL);
+      Animated.parallel([
+        Animated.timing(backdropOpacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+        // overshootClamping: 0을 넘어 더 올라가면 시트 아래가 비어 보이므로 튀지 않게 막는다.
+        Animated.spring(sheetTranslateY, {
+          toValue: 0,
+          damping: 22,
+          stiffness: 180,
+          overshootClamping: true,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      return;
+    }
+
+    if (!isSheetMounted) return;
+    // 닫을 때도 배경은 서서히 사라지고 시트는 내려간다.
+    Animated.parallel([
+      Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
+      Animated.timing(sheetTranslateY, { toValue: SHEET_TRAVEL, duration: 180, useNativeDriver: true }),
+    ]).start(() => setIsSheetMounted(false));
+  }, [isEmotionModalVisible]);
   const [isDakkuMode, setIsDakkuMode] = useState<boolean>(false);
   const [tempEmotion, setTempEmotion] = useState<string | null>(null);
   
@@ -232,13 +265,18 @@ const DiaryScreen = () => {
 
   const renderEmotionModal = () => (
     <Modal
-      visible={isEmotionModalVisible}
-      animationType="slide"
+      visible={isSheetMounted}
+      // 기본 애니메이션 대신 직접 제어합니다: 배경은 투명도, 시트는 슬라이드.
+      animationType="none"
       transparent={true}
       onRequestClose={() => setIsEmotionModalVisible(false)}
     >
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setIsEmotionModalVisible(false)}>
-        <View style={styles.emotionModalContainer} onStartShouldSetResponder={() => true}>
+      <View style={styles.modalOverlay}>
+        <Animated.View style={[styles.modalBackdrop, { opacity: backdropOpacity }]}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setIsEmotionModalVisible(false)} />
+        </Animated.View>
+
+        <Animated.View style={[styles.emotionModalContainer, { transform: [{ translateY: sheetTranslateY }] }]}>
           <View style={styles.modalDragHandle} />
           <Text style={styles.modalDateText}>
             {currentYear}.{String(currentMonth).padStart(2, '0')}.{String(selectedDate).padStart(2, '0')} {selectedDate ? getDayOfWeek(currentYear, currentMonth, selectedDate) : ''}
@@ -259,8 +297,8 @@ const DiaryScreen = () => {
               );
             })}
           </View>
-        </View>
-      </TouchableOpacity>
+        </Animated.View>
+      </View>
     </Modal>
   );
 
@@ -618,8 +656,20 @@ const styles = StyleSheet.create({
   dayText: { fontFamily: 'NanumSquareRoundR', fontSize: 16, color: '#2a3a21' },
   todayText: { fontFamily: 'NanumSquareRoundB', color: '#15210f' },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'flex-end' },
-  emotionModalContainer: { backgroundColor: '#2a2a2a', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 25, alignItems: 'center', paddingBottom: Platform.OS === 'ios' ? 40 : 25 },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
+  // 어두운 배경은 시트와 분리해서 투명도만 변하도록 둡니다.
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.5)' },
+  // marginBottom(-40) + paddingBottom(+40): 시트를 화면 아래로 조금 더 늘려두어
+  // 애니메이션 중 아래쪽이 비어 보이지 않게 합니다.
+  emotionModalContainer: {
+    backgroundColor: '#2a2a2a',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 25,
+    alignItems: 'center',
+    marginBottom: -40,
+    paddingBottom: (Platform.OS === 'ios' ? 40 : 25) + 40,
+  },
   modalDragHandle: { width: 40, height: 4, backgroundColor: '#555', borderRadius: 2, marginBottom: 20 },
   modalDateText: { fontSize: 13, color: '#999', marginBottom: 8 },
   modalTitleText: { fontSize: 18, color: '#ffffff', fontWeight: 'bold', marginBottom: 30 },
