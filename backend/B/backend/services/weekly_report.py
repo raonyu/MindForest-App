@@ -17,18 +17,15 @@ from datetime import datetime, timedelta, timezone
 from statistics import mean
 from typing import Any
 
-from sqlalchemy import func
+from sqlalchemy import func, or_, and_
 from sqlalchemy.orm import Session
 
 import models
 from routine_manager import routine_manager
+from services.emotion_scores import temperature, score, usable, POSITIVE, NEGATIVE, NEUTRAL, EMOTIONS
 
 # --- 감정 분류 -------------------------------------------------------------
 # surprise는 긍정/부정 어느 쪽도 아니라서 마음 온도 계산에서 제외한다.
-POSITIVE = ("joy", "trust", "anticipation")
-NEGATIVE = ("sadness", "anger", "fear", "disgust")
-NEUTRAL = ("surprise",)
-EMOTIONS = POSITIVE + NEGATIVE + NEUTRAL
 
 EMOTION_LABELS = {
     "joy": "기쁨", "trust": "신뢰", "anticipation": "기대", "surprise": "놀람",
@@ -97,15 +94,12 @@ def _aware(value: datetime) -> datetime:
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
 
-def _score(diary, emotion: str) -> float:
-    return float(getattr(diary, emotion, 0.0) or 0.0)
+def _score(diary, emotion):
+    return score(diary, emotion)
 
 
-def _temperature(diary) -> float:
-    """마음 온도: 50을 기준으로 긍정 평균과 부정 평균의 차이를 반영(0~100)."""
-    positive = mean(_score(diary, e) for e in POSITIVE)
-    negative = mean(_score(diary, e) for e in NEGATIVE)
-    return max(0.0, min(100.0, 50 + (positive - negative) / 2))
+def _temperature(diary):
+    return temperature(diary)
 
 
 def _daily_temperatures(diaries) -> list[tuple[Any, float]]:
@@ -277,7 +271,9 @@ def _baseline_card(db: Session, user_id: str, week_diaries, week_start: datetime
     ]
     row = (
         db.query(*columns)
-        .filter(models.Diary.user_id == user_id, models.Diary.created_at < week_start)
+        .filter(models.Diary.user_id == user_id, models.Diary.created_at < week_start,
+                or_(models.Diary.analysis_status == "completed",
+                    and_(models.Diary.analysis_status == "idle", or_(*(getattr(models.Diary, e) > 0 for e in EMOTIONS)))))
         .one()
     )
     past_count = int(row[0] or 0)
@@ -323,7 +319,7 @@ def _survey_card(db: Session, user_id: str, assigned_category: str | None) -> di
     if len(results) < 2:
         return _card(
             BUILDING,
-            data={"latest": {"score": results[0].score, "date": _aware(results[0].created_at).date().isoformat()}},
+            data={"label": SURVEY_LABELS.get((results[0].survey_type or "").upper(), "자가검사"), "latest": {"score": results[0].score, "date": _aware(results[0].created_at).date().isoformat()}},
             message="검사를 한 번 더 하면 이전 결과와 비교해 드릴게요.",
         )
 
@@ -437,85 +433,14 @@ def _resilience_card(diaries) -> dict:
 
 
 # --- 카드 6. 주요 상황·키워드 -------------------------------------------------
-def _keyword_card(diaries) -> dict:
-    tagged = [d for d in diaries if (d.keywords or "").strip()]
-    if not tagged:
-        return _card(INSUFFICIENT, message=MSG_INSUFFICIENT)
-    if len(tagged) < MIN_KEYWORD_DIARIES:
-        return _card(BUILDING, message=_building_message(MIN_KEYWORD_DIARIES - len(tagged)))
-
-    pairs: Counter = Counter()
-    keyword_total: Counter = Counter()
-    for diary in tagged:
-        dominant = _dominant_emotion([diary])
-        for keyword in {k.strip() for k in diary.keywords.split(",") if k.strip()}:
-            keyword_total[keyword] += 1
-            if dominant:
-                pairs[(keyword, dominant)] += 1
-
-    items = [
-        {
-            "keyword": keyword,
-            **_emotion_payload(emotion),
-            "count": count,
-            "keyword_count": keyword_total[keyword],
-        }
-        for (keyword, emotion), count in pairs.most_common(5)
-    ]
-    return _card(READY, data={"items": items, "records": len(tagged)})
+def _keyword_card(diaries):
+    from services.report_enhancements import keyword_card
+    return keyword_card(diaries, EMOTION_LABELS, EMOTION_EMOJI)
 
 
-# --- 카드 7. 루틴과 감정 변화 -------------------------------------------------
-def _routine_card(diaries) -> dict:
-    """루틴을 한 날과 하지 않은 날의 마음 온도를 비교한다(인과가 아닌 관찰)."""
-    with_routine: dict[str, list[float]] = defaultdict(list)
-    without_routine: list[float] = []
-
-    for diary in diaries:
-        name = (diary.routine_name or "").strip()
-        temperature = _temperature(diary)
-        if name:
-            with_routine[name].append(temperature)
-        else:
-            without_routine.append(temperature)
-
-    if not with_routine:
-        return _card(INSUFFICIENT, message="루틴을 기록한 날이 아직 없어요.")
-    if len(without_routine) < MIN_ROUTINE_RECORDS:
-        return _card(
-            BUILDING,
-            message="루틴을 하지 않은 날의 기록이 더 모이면 비교해 드릴게요.",
-        )
-
-    baseline = round(mean(without_routine), 1)
-    items = []
-    for name, values in with_routine.items():
-        average = round(mean(values), 1)
-        delta = round(average - baseline, 1)
-        items.append(
-            {
-                "routine": name,
-                "average": average,
-                "delta": abs(delta),
-                "direction": _direction(delta),
-                "records": len(values),
-                "enough": len(values) >= MIN_ROUTINE_RECORDS,
-            }
-        )
-    items.sort(key=lambda item: (item["enough"], item["average"]), reverse=True)
-
-    status = READY if any(item["enough"] for item in items) else BUILDING
-    message = None if status == READY else "같은 루틴을 조금 더 반복하면 비교가 정확해져요."
-    return _card(
-        status,
-        data={
-            "baseline_average": baseline,
-            "baseline_days": len(without_routine),
-            "items": items,
-            "note": "루틴을 한 날의 평균 차이일 뿐, 루틴이 원인이라는 뜻은 아니에요.",
-        },
-        message=message,
-    )
+def _routine_card(db, user_id, diaries):
+    from services.report_enhancements import routine_card
+    return routine_card(db, user_id, diaries)
 
 
 # --- 카드 8. 다음 주 맞춤 루틴 -------------------------------------------------
@@ -568,6 +493,8 @@ def build_weekly_report(db: Session, user_id: str) -> dict:
         .all()
     )
 
+    recent = [d for d in recent if usable(d)]
+
     week_diaries = [d for d in recent if _aware(d.created_at) >= week_start]
     prev_week_diaries = [d for d in recent if two_weeks_start <= _aware(d.created_at) < week_start]
     two_week_diaries = [d for d in recent if _aware(d.created_at) >= two_weeks_start]
@@ -576,7 +503,9 @@ def build_weekly_report(db: Session, user_id: str) -> dict:
     survey = _survey_card(db, user_id, user.assigned_category)
     summary = _alert_card(week_diaries, baseline, survey)
 
+    from services.report_enhancements import self_report_card
     cards = {
+        "self_report": self_report_card(week_diaries),
         "summary": summary,
         "spectrum": _spectrum_card(week_diaries),
         "trend": _trend_card(week_diaries, prev_week_diaries),
@@ -585,13 +514,15 @@ def build_weekly_report(db: Session, user_id: str) -> dict:
         "composite_days": _composite_card(db, user_id, two_weeks_start),
         "resilience": _resilience_card(two_week_diaries),
         "keywords": _keyword_card(two_week_diaries),
-        "routine_effect": _routine_card(recent),
+        "routine_effect": _routine_card(db, user_id, recent),
         "next_routines": _next_routine_card(user, week_diaries, summary),
     }
 
     recorded_days = len({_aware(d.created_at).date() for d in week_diaries})
 
+    from services.emotion_trend_logic import analyze_personal_emotion_trend
     return {
+        "personal_trend": analyze_personal_emotion_trend(db, user_id),
         "status": "ok",
         "generated_at": now.isoformat(),
         "period": {"start": week_start.date().isoformat(), "end": now.date().isoformat(), "days": 7},
@@ -670,12 +601,19 @@ def build_chat_report_summary(db: Session, user_id: str) -> str | None:
 
     # 루틴 효과
     routine = cards.get("routine_effect", {}).get("data")
-    if routine and routine.get("items"):
+    if routine and routine.get("items") and routine.get("baseline_average") is not None:
         best = routine["items"][0]
         lines.append(
             f"- 루틴 '{best['routine']}' 수행일 평균 {best['average']}점 "
             f"(루틴 없는 날 평균 {routine['baseline_average']}점, 기록 {best['records']}회)"
         )
+
+    if routine and routine.get("paired_items"):
+        observed = routine["paired_items"][0]
+        lines.append(f"- 루틴 전후 관찰: {observed['routine']}, 차이 {observed['signed_delta']:+.1f}점, {observed['records']}회 (인과 효과 아님)")
+    own = cards.get("self_report", {}).get("data")
+    if own:
+        lines.append(f"- 자가보고와 AI의 내부 환산 마음 온도 평균 절대 차이: {own['mean_absolute_gap']}점 (서로 다른 척도, AI가 정답이라는 뜻 아님)")
 
     # 복합 감정 데이
     composite = cards.get("composite_days", {}).get("data")

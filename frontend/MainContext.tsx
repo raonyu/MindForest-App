@@ -1,4 +1,4 @@
-import React, { createContext, useContext } from 'react';
+import { createContext, useContext } from 'react';
 
 // 보관함의 설계도
 const MainContext = createContext<any>(null);

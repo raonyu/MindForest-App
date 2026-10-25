@@ -27,7 +27,7 @@ def get_all_master_routines(db: Session = Depends(get_db)):
     (루틴 도감이나 관리용으로 사용)
     """
     routines = db.query(models.RoutineMaster).all()
-    
+
     result = {}
     for r in routines:
         if r.category not in result:
@@ -36,7 +36,7 @@ def get_all_master_routines(db: Session = Depends(get_db)):
             "level": r.level,
             "content": r.content
         })
-    
+
     return result
 
 from typing import Optional
@@ -51,24 +51,9 @@ def complete_routine(user_routine_id: int, data: Optional[RoutineCompleteRequest
     routine = db.query(models.UserRoutine).filter(models.UserRoutine.id == user_routine_id).first()
     if not routine:
         raise HTTPException(status_code=404, detail="루틴을 찾을 수 없습니다.")
-    
-    if data and data.is_completed is not None:
-        routine.is_completed = data.is_completed
-    else:
-        routine.is_completed = not routine.is_completed
-    
-    # [동기화] 오늘 작성된 일기(Diary)가 있다면, 일기 테이블 내 루틴 완료 관련 필드도 자동으로 동기화합니다.
-    today_date = routine.date
-    existing_diary = db.query(models.Diary).filter(
-        models.Diary.user_id == routine.user_id,
-        func.date(models.Diary.created_at) == today_date
-    ).first()
-    
-    if existing_diary:
-        existing_diary.routine_name = routine.routine_detail.content if routine.routine_detail else None
-        existing_diary.routine_category = routine.routine_detail.category if routine.routine_detail else None
-        existing_diary.is_done = routine.is_completed
-        existing_diary.score_diff = 10.0 if routine.is_completed else 0.0
 
+    from services.routine_observations import set_completion
+    completed = data.is_completed if data and data.is_completed is not None else not routine.is_completed
+    set_completion(db, routine, completed)
     db.commit()
     return {"message": "routine status updated!", "is_completed": routine.is_completed}

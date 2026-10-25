@@ -4,8 +4,8 @@
  *
  * @format
  */
-import React, { useEffect, useRef, createContext, useContext, useState } from 'react';
-import { Animated, StatusBar, StyleSheet, useColorScheme, View, Text, Pressable, TouchableOpacity, FlatList, ListRenderItem, Platform, Keyboard } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, StyleSheet, View, Text, TouchableOpacity, Platform, Keyboard } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -14,7 +14,7 @@ import MainContext from './MainContext';
 
 import { COLORS } from './assets/Maincolors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import LinearGradient from 'react-native-linear-gradient';
+import { LinearGradient } from './Gradient';
 // import {LinearGradient} from 'expo-linear-gradient';
 
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -42,7 +42,7 @@ const BottomBar = () => {
     } else {
       yPosAnim.setValue(100);
     }
-  }, [content]);
+  }, [content, yPosAnim]);
 
   // 키보드 이벤트로 바 위치 보정
   // 안드로이드는 매니페스트의 adjustResize 덕분에 화면 자체가 키보드 위로 줄어듭니다.
@@ -58,7 +58,7 @@ const BottomBar = () => {
       Animated.timing(keyboardAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start();
     });
     return () => { showSub.remove(); hideSub.remove(); };
-  }, []);
+  }, [keyboardAnim]);
 
   if (!content) return null;
 
@@ -158,9 +158,9 @@ const ServiceScreen = () => (
 );
 
 function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+
   const [user, setUser] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [_isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const checkLoginStatus = async () => {

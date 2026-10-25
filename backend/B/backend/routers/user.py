@@ -56,13 +56,13 @@ def complete_onboarding(data: OnboardingRequest, db: Session = Depends(get_db)):
     # 1. AI 분석 (결과 예: DEPRESSION)
     chat_history = [{"role": "user", "content": res} for res in data.responses]
     analysis = get_chat_response("분석해줘", chat_history=chat_history, is_onboarding_done=False)
-    
+
     # 2. 카테고리 코드 세척
     category_code = str(analysis["category"]).strip().upper()
 
     # 3. [핵심] DB의 Animal 테이블에서 실제 이름을 가져옴
     animal_info = db.query(models.Animal).filter(models.Animal.category == category_code).first()
-    
+
     # 4. 유저 테이블에 즉시 기록 (이게 되어야 Profile에서 null이 안 나옴)
     user.assigned_category = category_code
     if animal_info:
@@ -71,10 +71,10 @@ def complete_onboarding(data: OnboardingRequest, db: Session = Depends(get_db)):
         user.user_animal = f"신비로운 {category_code}" # DB에 없을 때 방어코드
 
     user.is_onboarding_done = True
-    
+
     # 5. 루틴 데이터도 이때 생성해버림
     try:
-        routine_manager.initialize_user_routine(db, user.id, category_code)
+        routine_manager.routine_manager.initialize_user_routine(db, user.id, category_code)
     except Exception as e:
         print(f"루틴 할당 실패: {e}")
 
@@ -83,7 +83,7 @@ def complete_onboarding(data: OnboardingRequest, db: Session = Depends(get_db)):
     db.refresh(user)
 
     return {
-        "status": "success", 
+        "status": "success",
         "animal_category": user.user_animal, # 요청하신 이름으로 반환
         "category_code": user.assigned_category
     }

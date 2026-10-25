@@ -10,12 +10,12 @@ class User(Base):
     id = Column(String, primary_key=True, index=True)
     email = Column(String, unique=True)
     password = Column(String)
-    
+
     # [요구사항 2] 가입일(signup_date) 필드: Python 3.14 호환을 위해 datetime.datetime.now 사용
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.datetime.now(datetime.timezone.utc))
-    
+
     is_onboarding_done = Column(Boolean, default=False)
-    user_animal = Column(String, nullable=True) 
+    user_animal = Column(String, nullable=True)
     assigned_category = Column(String, nullable=True)
 
     diaries = relationship("Diary", back_populates="author")
@@ -34,15 +34,19 @@ class Diary(Base):
 
     # 루틴 데이터
     routine_name = Column(String, nullable=True)
-    
-    # [요구사항 1] 신규 필드 추가
     routine_category = Column(String, nullable=True)
-    score_diff = Column(Float, default=0.0)
-
+    score_diff = Column(Float, nullable=True)
     is_done = Column(Boolean, default=False)
-    emotion = Column(String, nullable=True)
 
-    # 8가지 감정 수치
+    # 사용자 Self-Report - 첫 번째 감정
+    emotion = Column(String, nullable=True)
+    emotion_intensity = Column(Integer, nullable=True)
+
+    # 사용자 Self-Report - 두 번째 감정
+    secondary_emotion = Column(String, nullable=True)
+    secondary_emotion_intensity = Column(Integer, nullable=True)
+
+    # AI 8가지 감정 수치
     joy = Column(Float, default=0.0)
     sadness = Column(Float, default=0.0)
     anger = Column(Float, default=0.0)
@@ -52,15 +56,31 @@ class Diary(Base):
     surprise = Column(Float, default=0.0)
     anticipation = Column(Float, default=0.0)
 
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.datetime.now(datetime.timezone.utc))
-    analysis_comment = Column(String)
-
-    # [주간 리포트] 상황·키워드 카드용. 쉼표로 구분된 키워드 (예: "시험,수면")
     keywords = Column(String, nullable=True)
+    analysis_status = Column(String, default="idle", nullable=False)
+    confidence = Column(Float, nullable=True)
+    bws_used = Column(Boolean, default=False, nullable=False)
+    analysis_completed_at = Column(DateTime(timezone=True), nullable=True)
+    analysis_error = Column(String, nullable=True)
+    analysis_requested_at = Column(DateTime(timezone=True), nullable=True)
+
+
+    # 일기 수정 후 이전 분석 결과가 덮어쓰는 것 방지
+    analysis_version = Column(Integer, default=0, nullable=False)
+
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+
+    analysis_comment = Column(String, nullable=True)
 
     author = relationship("User", back_populates="diaries")
-    analysis_data = relationship("Analysis", back_populates="diary", uselist=False)
-
+    analysis_data = relationship(
+        "Analysis",
+        back_populates="diary",
+        uselist=False
+    )
 
 # --- 3. 개별 일기 심층 분석 테이블 ---
 class Analysis(Base):
@@ -68,8 +88,8 @@ class Analysis(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     diary_id = Column(Integer, ForeignKey("diaries.id"))
-    emotion = Column(String) 
-    score = Column(Float, default=0.0) 
+    emotion = Column(String)
+    score = Column(Float, default=0.0)
     feedback = Column(Text)
 
     diary = relationship("Diary", back_populates="analysis_data")
@@ -151,9 +171,40 @@ class UserRoutine(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(String, ForeignKey("users.id"))
     routine_id = Column(Integer, ForeignKey("routine_master.id"))
-    
+
     # [오류 해결] datetime 모듈의 date.today를 사용하여 할당된 날짜를 정확히 기록
     date = Column(Date, default=datetime.date.today)
-    
+
     is_completed = Column(Boolean, default=False)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
     routine_detail = relationship("RoutineMaster")
+
+
+class RoutineObservation(Base):
+    __tablename__ = "routine_observations"
+    id = Column(Integer, primary_key=True)
+    user_routine_id = Column(Integer, ForeignKey("user_routines.id"), unique=True, index=True)
+    user_id = Column(String, ForeignKey("users.id"), index=True)
+    completed_at = Column(DateTime(timezone=True), nullable=False)
+    before_diary_id = Column(Integer, nullable=True)
+    before_version = Column(Integer, nullable=True)
+    before_temperature = Column(Float, nullable=True)
+    after_diary_id = Column(Integer, nullable=True)
+    after_version = Column(Integer, nullable=True)
+    after_temperature = Column(Float, nullable=True)
+    measured_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class AnalysisRun(Base):
+    __tablename__ = "analysis_runs"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String, index=True)
+    diary_id = Column(Integer, index=True)
+    analysis_version = Column(Integer)
+    status = Column(String, nullable=False)
+    total_ms = Column(Float, nullable=False)
+    model_ms = Column(Float, nullable=True)
+    bws_ms = Column(Float, nullable=True)
+    bws_attempted = Column(Boolean, default=False)
+    bws_used = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.datetime.now(datetime.timezone.utc), index=True)

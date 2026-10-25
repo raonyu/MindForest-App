@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import get_db
 import models
@@ -19,10 +19,10 @@ def get_analysis(diary_id: int, db: Session = Depends(get_db)):
     [요구사항 반영] Diary 테이블에 추가된 루틴 카테고리와 score_diff를 결과에 포함합니다.
     """
     diary = db.query(models.Diary).filter(models.Diary.id == diary_id).first()
-    
+
     if not diary:
         raise HTTPException(status_code=404, detail="분석 결과를 찾을 수 없습니다.")
-        
+
     return {
         "diary_id": diary.id,
         "content": diary.content,
@@ -53,11 +53,11 @@ def emotion_alert(user_id: str, db: Session = Depends(get_db)):
     """
     사용자의 최근 7일 감정 흐름을 분석하여 경고 레벨을 반환합니다.
     """
-    recent_data = get_recent_emotions(user_id, db) 
+    recent_data = get_recent_emotions(user_id, db)
 
     if not recent_data:
         return {
-            "level": "LOW", 
+            "level": "LOW",
             "message": "아직 분석할 데이터가 부족해요. 일기를 써서 마음을 기록해보세요!"
         }
 
@@ -74,7 +74,7 @@ def get_report(user_id: str, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-    
+
     # 1. 새 주간 리포트 엔진 호출 (카드별 상태를 따로 내려줍니다)
     try:
         weekly_report = build_weekly_report(db, user_id)
@@ -94,7 +94,7 @@ def get_report(user_id: str, db: Session = Depends(get_db)):
         models.UserRoutine.date == today
     ).all()
     recommendations = [r.routine_detail.content for r in routines if r.routine_detail]
-    
+
     # 3. 가입일 확인 (요구사항 2: signup_date)
     signup_date = user.created_at
 
@@ -106,3 +106,19 @@ def get_report(user_id: str, db: Session = Depends(get_db)):
         "weekly_report": weekly_report,  # 카드 + 상태 구조
         "recommendations": recommendations
     }
+
+
+@router.get("/api/emotion-trend/{user_id}")
+def personal_emotion_trend(user_id: str, db: Session = Depends(get_db)):
+    if not db.get(models.User, user_id):
+        raise HTTPException(404, "사용자를 찾을 수 없습니다.")
+    from services.emotion_trend_logic import analyze_personal_emotion_trend
+    return analyze_personal_emotion_trend(db, user_id)
+
+
+@router.get("/api/metrics/{user_id}")
+def analysis_metrics(user_id: str, days: int = Query(default=30, ge=1, le=365), db: Session = Depends(get_db)):
+    if not db.get(models.User, user_id):
+        raise HTTPException(404, "사용자를 찾을 수 없습니다.")
+    from services.analysis_metrics import summary
+    return summary(db, user_id, days)

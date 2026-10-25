@@ -1,7 +1,8 @@
+import { notify } from './notify';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { useMainContext } from './MainContext';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Alert, View, Text, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Modal } from 'react-native';
 import ReportModal, { WeeklyReport } from './ReportModal';
 import { useBottomBar } from './BottomBarContext';
 import { API_BASE_URL } from './config';
@@ -45,7 +46,7 @@ const fetchCurrentData = async (userID: string): Promise<currentData | null> => 
     });
     if (!responce.ok) {
       const errorData = await responce.json();
-      Alert.alert("데이터 불러오기 실패", errorData.detail);
+      notify("데이터 불러오기 실패", errorData.detail);
       return null;
     }
     return await responce.json();
@@ -68,7 +69,7 @@ const fetchEmotionData = async (userID: string): Promise<emotionData | null> => 
     });
     if (!responce.ok) {
       const errorData = await responce.json();
-      Alert.alert("데이터 불러오기 실패", errorData.detail);
+      notify("데이터 불러오기 실패", errorData.detail);
       return null;
     }
     return await responce.json();
@@ -191,25 +192,6 @@ const MainScreen = () => {
     fetchAnimals();
   }, []);
 
-  const requestSurvey = async () => {
-    try {
-      const surveyType = 'DEPRESSION';
-      const response = await fetch(`${API_BASE_URL}/api/survey/${surveyType}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        Alert.alert('사전 테스트 요청 실패', errorData.detail || '서버 오류');
-        return;
-      }
-      const data = await response.json();
-    } catch (error) {
-      console.error('사전 테스트 요청 실패:', error);
-      Alert.alert('사전 테스트 요청 실패', '네트워크 오류');
-    }
-  };
-
   const startCategorySurvey = async (selectedType?: string) => {
     let surveyType = selectedType || currentUserData?.assigned_category;
     if (!selectedType && currentUserData?.animal_category === "조용히 움츠린 거북이") {
@@ -217,14 +199,14 @@ const MainScreen = () => {
     }
 
     if (!surveyType) {
-      Alert.alert("알림", "아직 진행할 수 있는 유형 설문조사가 없습니다.");
+      notify("알림", "아직 진행할 수 있는 유형 설문조사가 없습니다.");
       return;
     }
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/survey/${surveyType}`);
       if (!response.ok) {
-        Alert.alert('설문 문항 불러오기 실패', '서버 오류');
+        notify('설문 문항 불러오기 실패', '서버 오류');
         return;
       }
 
@@ -232,11 +214,11 @@ const MainScreen = () => {
       if (data && data.length > 0) {
         navigation.navigate("채팅", { surveyMode: true, surveyQuestions: data, surveyType: surveyType });
       } else {
-        Alert.alert('알림', '가져올 설문 문항이 없습니다.');
+        notify('알림', '가져올 설문 문항이 없습니다.');
       }
     } catch (error) {
       console.error('설문 문항 불러오기 실패:', error);
-      Alert.alert('오류', '네트워크 연결을 확인해주세요.');
+      notify('오류', '네트워크 연결을 확인해주세요.');
     }
   };
 
@@ -257,18 +239,18 @@ const MainScreen = () => {
       }
     }
     if (isFocused) load();
-  }, [user?.user_id, isFocused]);
+  }, [user?.user_id, isFocused, setUser]);
 
   useEffect(() => {
     if (isFocused) {
       setBottomBarContent(null);
       return () => setBottomBarContent(null);
     }
-  }, [isFocused]);
+  }, [isFocused, setBottomBarContent]);
 
   useEffect(() => {
     if (currentUserData?.diagnosis_result?.total_score !== undefined && currentUserData.diagnosis_result.total_score >= 20) {
-      Alert.alert("알림", "현재 감정점수가 높게 측정되었습니다.\n루틴 수행을 추천드립니다.", [{ text: "확인" }]);
+      notify("알림", "현재 감정점수가 높게 측정되었습니다.\n루틴 수행을 추천드립니다.", [{ text: "확인" }]);
     }
   }, [currentUserData?.diagnosis_result?.total_score]);
 
@@ -294,8 +276,8 @@ const MainScreen = () => {
               <Text style={styles.modalTitle}>어떤 테스트를 진행해볼까요?</Text>
               <ScrollView style={{ maxHeight: 400 }}>
                 {animalList.map((animal, index) => (
-                  <TouchableOpacity 
-                    key={index} 
+                  <TouchableOpacity
+                    key={index}
                     style={styles.animalListItem}
                     onPress={() => {
                       setTestListModalVisible(false);

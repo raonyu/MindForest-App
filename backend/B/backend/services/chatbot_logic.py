@@ -5,7 +5,8 @@ from datetime import datetime
 
 # 환경변수 로드 및 OpenAI 클라이언트 설정
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+def _client():
+    return OpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=15.0, max_retries=0)
 
 # [1] 고정된 온보딩 20문항 데이터 (절대 수정/삭제하지 마세요)
 ONBOARDING_QUESTIONS = [
@@ -269,7 +270,7 @@ def get_chat_response(user_message, chat_history=None, is_onboarding_done=False,
                 "detail": question["detail"],
                 "is_finished": False
             }
-        
+
         # 20문항 답변이 모두 완료된 경우: 고정 점수표와 기회 대비 비율로 카테고리 분석
         else:
             return analyze_onboarding_answers(user_answers)
@@ -321,10 +322,10 @@ def get_chat_response(user_message, chat_history=None, is_onboarding_done=False,
         user_name = user_id if user_id else "사용자"
         animal_desc = f"[{user_animal}] 유형" if user_animal else "사전 테스트 전"
         system_prompt = f"""
-        너는 '마음의 숲'의 다정하고 따뜻한 심리 상담사야. 
+        너는 '마음의 숲'의 다정하고 따뜻한 심리 상담사야.
         상담 대상 사용자의 이름(아이디)은 [{user_name}]님이야. 대화할 때 사용자를 다정하게 "{user_name}님"이라고 부르며 깊이 공감해줘.
         사용자는 현재 {animal_desc}으로 진단받았어.
-        
+
         [기본 정보]
         - {user_name}님이 우리 숲에 머문 지 {days_since_signup}일째야.
         - 사용자의 유형({animal_desc})과 성향에 맞춰 따뜻하게 공감하고 격려해줘.
@@ -337,20 +338,20 @@ def get_chat_response(user_message, chat_history=None, is_onboarding_done=False,
         {state_block}
         {report_block}
         """
-        
+
         try:
-            response = client.chat.completions.create(
+            response = _client().chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "system", "content": system_prompt}] + chat_history + [{"role": "user", "content": user_message}],
                 temperature=0.7
             )
             return {
-                "is_finished": False, 
+                "is_finished": False,
                 "reply_message": response.choices[0].message.content.strip()
             }
         except Exception as e:
             print(f"상담 GPT 에러: {e}")
             return {
-                "is_finished": False, 
+                "is_finished": False,
                 "reply_message": "잠시 숲이 조용하네요. 다시 말을 걸어주시겠어요?"
             }

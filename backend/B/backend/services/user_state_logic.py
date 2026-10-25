@@ -1,3 +1,4 @@
+from services.emotion_scores import temperature, usable
 from datetime import datetime, timedelta, timezone
 import json
 import re
@@ -6,9 +7,9 @@ from sqlalchemy.orm import Session
 
 import models
 
-POSITIVE_EMOTIONS = ["joy", "trust", "anticipation", "surprise"]
+POSITIVE_EMOTIONS = ["joy", "trust", "anticipation"]
 NEGATIVE_EMOTIONS = ["sadness", "anger", "fear", "disgust"]
-ALL_EMOTIONS = POSITIVE_EMOTIONS + NEGATIVE_EMOTIONS
+ALL_EMOTIONS = POSITIVE_EMOTIONS + NEGATIVE_EMOTIONS + ["surprise"]
 
 SURVEY_NAMES = {
     "DEPRESSION": "PHQ-9",
@@ -70,9 +71,7 @@ def _extract_diary_text(content):
 
 
 def _mind_temperature(diary):
-    pos_avg = sum(float(getattr(diary, emotion, 0.0) or 0.0) for emotion in POSITIVE_EMOTIONS) / len(POSITIVE_EMOTIONS)
-    neg_avg = sum(float(getattr(diary, emotion, 0.0) or 0.0) for emotion in NEGATIVE_EMOTIONS) / len(NEGATIVE_EMOTIONS)
-    return max(0.0, min(100.0, 50.0 + (pos_avg - neg_avg) / 2.0))
+    return temperature(diary)
 
 
 def _survey_level(survey_type, score):
@@ -166,6 +165,8 @@ def analyze_user_state(db: Session, user_id: str):
         models.Diary.user_id == user_id,
         models.Diary.created_at >= since_14,
     ).order_by(models.Diary.created_at.asc()).all()
+
+    diaries = [diary for diary in diaries if usable(diary)]
 
     if not diaries:
         return _build_empty_state(user_id)

@@ -1,4 +1,16 @@
 {
   "name": "MindForest",
-  "displayName": "MindForest"
+  "displayName": "MindForest",
+  "expo": {
+    "name": "MindForest",
+    "slug": "mindforest",
+    "web": {
+      "bundler": "metro"
+    },
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ]
+  }
 }

@@ -1,36 +1,65 @@
 import json
-from datetime import datetime
-from typing import Any, List, Optional
+from datetime import datetime, timezone
+from time import perf_counter
+from typing import List, Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
-from sqlalchemy import extract, func
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
+from sqlalchemy import func, extract
+from pydantic import BaseModel, Field
 
+from database import get_db, SessionLocal
 import models
 import routine_manager
-from database import get_db
-from services.ai_logic import check_anomaly_level
+
+# 실제 감정 분석을 비동기로 실행합니다.
 from services.emotion_pipeline import analyze_emotion_pipeline
+router = APIRouter()
 
 
-# --- [1. 요청 데이터 모델] ---
+# AI가 출력하는 Plutchik 8감정
+EMOTION_KEYS = [
+    "joy",
+    "trust",
+    "fear",
+    "surprise",
+    "sadness",
+    "disgust",
+    "anger",
+    "anticipation",
+]
+
+
+# =========================================================
+# 요청 모델
+# =========================================================
+
 class DiaryRequest(BaseModel):
     user_id: str
     date: Optional[str] = None
-    emotion: Optional[str] = None
 
-    # 다꾸용 분리 데이터 컬럼들
+    # 사용자 Self-Report 1순위 감정
+    emotion: Optional[str] = None
+    emotion_intensity: Optional[int] = Field(default=None, ge=1, le=5)
+
+    # 사용자 Self-Report 2순위 감정
+    secondary_emotion: Optional[str] = None
+    secondary_emotion_intensity: Optional[int] = Field(default=None, ge=1, le=5)
+
+    # 일기 데이터
     main_text: str = ""
     bg_color_id: str = "#ffffff"
     font: str = "System"
     elements: List[Any] = []
 
+    # 기존 루틴 데이터
     routine_name: Optional[str] = None
     routine_category: Optional[str] = None
     score_diff: float = 0.0
     is_done: bool = False
-    content: Optional[str] = None  # 구버전 호환용 방어코드
+
+    # 구버전 프론트 호환용
+    content: Optional[str] = None
 
 
 class RoutineRequest(BaseModel):
@@ -39,227 +68,428 @@ class RoutineRequest(BaseModel):
     is_done: bool
 
 
-router = APIRouter()
+# =========================================================
+# 백그라운드 AI 감정 분석
+# =========================================================
 
+def run_emotion_analysis(
+    diary_id: int,
+    analysis_version: int,
+    diary_text: str,
+):
+    """
+    일기 저장 응답이 끝난 뒤 백그라운드에서 실행된다.
 
-# --- [2. 루틴 상태 업데이트 (POST)] ---
-@router.post("/routine")
-def update_routine_status(data: RoutineRequest, db: Session = Depends(get_db)):
+    중요:
+    요청에서 사용한 db Session을 재사용하지 않고
+    여기서 새로운 SessionLocal을 연다.
+    """
+
+    db = SessionLocal()
+    started = perf_counter()
+    result = None
+    run_status = "discarded"
+
     try:
-        target_date = datetime.now().date()
+        result = analyze_emotion_pipeline(diary_text)
+        if not result or result.get("status") == "failed":
+            raise RuntimeError("감정 분석을 완료하지 못했어요. 모델 설정을 확인해주세요.")
 
-        routine_category = "활동형"
-        master_routine = db.query(models.RoutineMaster).filter(
-            models.RoutineMaster.content == data.routine_name
-        ).first()
-        if master_routine:
-            routine_category = master_routine.category
+        # Conditional write locks this revision before saving linked analysis rows.
+        # A concurrent edit/delete must not receive an older analysis result.
+        claimed = db.query(models.Diary).filter(
+            models.Diary.id == diary_id,
+            models.Diary.analysis_version == analysis_version,
+        ).update({models.Diary.analysis_status: "processing"}, synchronize_session=False)
+        if not claimed:
+            db.rollback()
+            return
 
-        existing_diary = db.query(models.Diary).filter(
-            models.Diary.user_id == data.user_id,
-            func.date(models.Diary.created_at) == target_date
-        ).first()
+        diary = (
+            db.query(models.Diary)
+            .filter(models.Diary.id == diary_id)
+            .first()
+        )
 
-        score_diff_val = 0.0
+        # 사용자가 분석 도중 일기를 삭제한 경우
+        if diary is None:
+            return
 
-        if existing_diary:
-            existing_diary.routine_name = data.routine_name
-            existing_diary.routine_category = routine_category
-            existing_diary.is_done = data.is_done
-            existing_diary.score_diff = score_diff_val
+        # 사용자가 분석 도중 일기를 다시 수정했다면
+        # 오래된 분석 결과는 저장하지 않는다.
+        if diary.analysis_version != analysis_version:
+            return
+
+        if result.get("status") == "empty_text":
+            run_status = "skipped"
+            diary.analysis_status = "skipped"
+            diary.analysis_error = None
+            diary.analysis_completed_at = datetime.now(timezone.utc)
+            db.commit()
+            return
+
+        emotions = result.get("emotions", {})
+
+        # 8감정 저장
+        for emotion_name in EMOTION_KEYS:
+            value = emotions.get(emotion_name, 0.0)
+
+            try:
+                value = float(value)
+            except (TypeError, ValueError):
+                value = 0.0
+
+            setattr(diary, emotion_name, value)
+
+        # 분석 부가정보 저장
+        diary.confidence = result.get("confidence")
+        diary.bws_used = bool(result.get("bws_used", False))
+        diary.analysis_status = "completed"
+        diary.analysis_error = None
+        diary.analysis_completed_at = datetime.now(timezone.utc)
+
+        # 기존 Analysis 테이블과도 호환
+        if emotions:
+            main_emotion = result.get("dominant_emotion")
+            if main_emotion not in EMOTION_KEYS:
+                main_emotion = max(EMOTION_KEYS, key=lambda key: float(emotions.get(key, 0.0)))
+            main_score = float(emotions.get(main_emotion, 0.0))
         else:
-            new_diary = models.Diary(
-                user_id=data.user_id,
-                content="",
-                routine_name=data.routine_name,
-                routine_category=routine_category,
-                is_done=data.is_done,
-                score_diff=score_diff_val,
-                created_at=datetime.combine(target_date, datetime.now().time())
+            main_emotion = "unknown"
+            main_score = 0.0
+
+        analysis_comment = result.get("analysis_comment", "")
+        diary.analysis_comment = analysis_comment
+        validation = result.get("bws_validation") or {}
+        db.query(models.BwsRecord).filter(models.BwsRecord.diary_id == diary.id).delete(synchronize_session=False)
+        if diary.bws_used and validation.get("best_emotion"):
+            db.add(models.BwsRecord(user_id=diary.user_id, diary_id=diary.id,
+                candidates=",".join(validation.get("candidates", [])),
+                best_emotion=validation.get("best_emotion"), worst_emotion=validation.get("worst_emotion"),
+                reasoning=validation.get("reasoning", ""), created_at=diary.created_at))
+
+        existing_analysis = (
+            db.query(models.Analysis)
+            .filter(models.Analysis.diary_id == diary.id)
+            .first()
+        )
+
+        if existing_analysis:
+            existing_analysis.emotion = main_emotion
+            existing_analysis.score = main_score
+            existing_analysis.feedback = analysis_comment
+        else:
+            new_analysis = models.Analysis(
+                diary_id=diary.id,
+                emotion=main_emotion,
+                score=main_score,
+                feedback=analysis_comment,
             )
-            db.add(new_diary)
+            db.add(new_analysis)
 
-        user_routine = db.query(models.UserRoutine).join(models.RoutineMaster).filter(
-            models.UserRoutine.user_id == data.user_id,
-            models.UserRoutine.date == target_date,
-            models.RoutineMaster.content == data.routine_name
-        ).first()
-        if user_routine:
-            user_routine.is_completed = data.is_done
-
+        from services.routine_observations import record_after_analysis
+        record_after_analysis(db, diary)
         db.commit()
-        return {"status": "success"}
+        run_status = "completed"
+
     except Exception as e:
+        run_status = "failed"
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+
+        # 분석 실패 상태 기록
+        try:
+            diary = (
+                db.query(models.Diary)
+                .filter(models.Diary.id == diary_id)
+                .first()
+            )
+
+            if diary:
+                db.query(models.Diary).filter(
+                    models.Diary.id == diary_id,
+                    models.Diary.analysis_version == analysis_version,
+                ).update({
+                    models.Diary.analysis_status: "failed",
+                    models.Diary.analysis_error: "일기는 저장됐지만 AI 분석 결과를 불러오지 못했어요.",
+                    models.Diary.analysis_completed_at: datetime.now(timezone.utc),
+                }, synchronize_session=False)
+                db.commit()
+
+        except Exception:
+            db.rollback()
+
+        print(f"[Emotion Analysis Error] diary_id={diary_id}: {e}")
+
+    finally:
+        db.close()
+        from services.analysis_metrics import persist_run
+        metrics = (result or {}).get("metrics", {"total_ms": (perf_counter()-started)*1000})
+        persist_run(SessionLocal, diary_id, analysis_version, run_status, metrics)
 
 
-# --- [3. 일기 저장 및 수정 (POST)] ---
-@router.post("")
-def create_or_update_diary(data: DiaryRequest, db: Session = Depends(get_db)):
+# =========================================================
+# 루틴 상태 업데이트
+# =========================================================
+
+@router.post("/routine")
+def update_routine_status(
+    data: RoutineRequest,
+    db: Session = Depends(get_db),
+):
+    user_routine = db.query(models.UserRoutine).join(models.RoutineMaster).filter(
+        models.UserRoutine.user_id == data.user_id,
+        models.UserRoutine.date == datetime.now().date(),
+        models.RoutineMaster.content == data.routine_name,
+    ).first()
+    if not user_routine:
+        raise HTTPException(404, "해당 날짜에 배정된 루틴이 없습니다.")
+    from services.routine_observations import set_completion
+    set_completion(db, user_routine, data.is_done)
+    db.commit()
+    return {"status": "success"}
+
+
+# =========================================================
+# 일기 생성 / 수정
+# =========================================================
+
+@router.post("", status_code=202)
+def create_or_update_diary(
+    data: DiaryRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
     try:
-        # 1. 날짜 및 텍스트 처리
+        # -------------------------------------------------
+        # 1. 날짜 처리
+        # -------------------------------------------------
+
+        if not db.get(models.User, data.user_id):
+            raise HTTPException(404, "사용자를 찾을 수 없습니다.")
         if data.date:
-            target_date = datetime.strptime(data.date, "%Y-%m-%d").date()
+            try:
+                datetime.strptime(data.date, "%Y-%m-%d")
+            except ValueError:
+                raise HTTPException(422, "날짜 형식은 YYYY-MM-DD여야 합니다.")
+        if data.date:
+            target_date = datetime.strptime(
+                data.date,
+                "%Y-%m-%d",
+            ).date()
         else:
             target_date = datetime.now().date()
+
+        # -------------------------------------------------
+        # 2. 일기 내용 처리
+        # -------------------------------------------------
 
         actual_main_text = data.main_text
         packaged_content = ""
 
+        # 구버전 프론트와 호환
         if data.content and not data.main_text:
             try:
                 parsed_content = json.loads(data.content)
-                actual_main_text = parsed_content.get("mainText", "")
+
+                actual_main_text = parsed_content.get(
+                    "mainText",
+                    "",
+                )
+
                 packaged_content = data.content
+
             except json.JSONDecodeError:
                 actual_main_text = data.content
                 packaged_content = data.content
+
         else:
-            packaged_content = json.dumps({
-                "mainText": data.main_text,
-                "bgColorId": data.bg_color_id,
-                "font": data.font,
-                "elements": data.elements
-            }, ensure_ascii=False)
+            packaged_content = json.dumps(
+                {
+                    "mainText": data.main_text,
+                    "bgColorId": data.bg_color_id,
+                    "font": data.font,
+                    "elements": data.elements,
+                },
+                ensure_ascii=False,
+            )
 
-        # 2. AI 감정 분석 (1차 KoELECTRA + 2차 BWS 검증)
-        analysis = analyze_emotion_pipeline(actual_main_text)
-        if not analysis:
-            raise HTTPException(status_code=500, detail="AI 분석 실패")
+        # -------------------------------------------------
+        # 3. 같은 날짜 기존 일기 확인
+        # -------------------------------------------------
 
-        emotions = analysis.get("emotions", {})
-        analysis_comment = analysis.get("analysis_comment", "")
-        
-        # 프론트에서 지정한 감정이 없으면 BWS 승리 감정(또는 1차 최고점 감정)을 대표 감정으로 설정
-        main_emotion = (
-            data.emotion
-            or analysis.get("dominant_emotion")
-            or (max(emotions, key=emotions.get) if emotions else "joy")
+        existing_diary = (
+            db.query(models.Diary)
+            .filter(
+                models.Diary.user_id == data.user_id,
+                func.date(models.Diary.created_at) == target_date,
+            )
+            .first()
         )
 
-        # 3. 루틴 자동 동기화 조회
-        completed_routine = db.query(models.UserRoutine).filter(
-            models.UserRoutine.user_id == data.user_id,
-            models.UserRoutine.date == target_date,
-            models.UserRoutine.is_completed == True
-        ).first()
+        # -------------------------------------------------
+        # 4. 기존 루틴 정보 확인
+        # -------------------------------------------------
 
-        default_routine_name = completed_routine.routine_detail.content if (completed_routine and completed_routine.routine_detail) else None
-        default_routine_category = completed_routine.routine_detail.category if (completed_routine and completed_routine.routine_detail) else None
-        default_is_done = True if completed_routine else False
+        completed_routine = (
+            db.query(models.UserRoutine)
+            .filter(
+                models.UserRoutine.user_id == data.user_id,
+                models.UserRoutine.date == target_date,
+                models.UserRoutine.is_completed == True,
+            )
+            .first()
+        )
 
-        routine_name = data.routine_name or default_routine_name
-        routine_category = data.routine_category or default_routine_category
-        is_done = data.is_done or default_is_done
-        score_diff = 0.0
+        default_routine_name = (
+            completed_routine.routine_detail.content
+            if (
+                completed_routine
+                and completed_routine.routine_detail
+            )
+            else None
+        )
 
-        # 4. Diary 테이블 Upsert (저장 또는 덮어쓰기)
-        existing_diary = db.query(models.Diary).filter(
-            models.Diary.user_id == data.user_id,
-            func.date(models.Diary.created_at) == target_date
-        ).first()
+        default_routine_category = (
+            completed_routine.routine_detail.category
+            if (
+                completed_routine
+                and completed_routine.routine_detail
+            )
+            else None
+        )
 
-        record_time = datetime.combine(target_date, datetime.now().time())
+        default_is_done = (
+            True if completed_routine else False
+        )
+
+        default_score_diff = None
+
+        # Completion comes from the assigned-routine records, not a client-supplied label.
+        routine_name = default_routine_name
+        routine_category = default_routine_category
+        is_done = default_is_done
+
+        score_diff = None
+
+        # -------------------------------------------------
+        # 5. DB 저장
+        #
+        # 여기서는 AI 분석을 하지 않는다.
+        # 일기를 먼저 저장하고 processing 상태로 만든다.
+        # -------------------------------------------------
 
         if existing_diary:
-            existing_diary.content = packaged_content
-            existing_diary.emotion = main_emotion
-            existing_diary.routine_name = routine_name
-            existing_diary.routine_category = routine_category
-            existing_diary.score_diff = score_diff
-            existing_diary.is_done = is_done
-            existing_diary.analysis_comment = analysis_comment
+            diary = existing_diary
 
-            for k, v in emotions.items():
-                setattr(existing_diary, k, v)
-            new_diary = existing_diary
+            diary.content = packaged_content
+
+            # Self-Report
+            if data.emotion is not None:
+                diary.emotion = data.emotion
+
+            if data.emotion_intensity is not None:
+                diary.emotion_intensity = data.emotion_intensity
+
+            diary.secondary_emotion = data.secondary_emotion
+            diary.secondary_emotion_intensity = (
+                data.secondary_emotion_intensity
+            )
+
+            # 루틴
+            diary.routine_name = routine_name
+            diary.routine_category = routine_category
+            diary.score_diff = score_diff
+            diary.is_done = is_done
+
+            # 새로운 분석 시작
+            diary.analysis_status = "processing"
+            diary.analysis_error = None
+            diary.analysis_comment = None
+            for key in EMOTION_KEYS:
+                setattr(diary, key, 0.0)
+            db.query(models.Analysis).filter(models.Analysis.diary_id == diary.id).delete(synchronize_session=False)
+            db.query(models.BwsRecord).filter(models.BwsRecord.diary_id == diary.id).delete(synchronize_session=False)
+            diary.confidence = None
+            diary.bws_used = False
+            diary.analysis_completed_at = None
+
+            # 수정할 때마다 버전 증가
+            diary.analysis_version = (
+                diary.analysis_version or 0
+            ) + 1
+
         else:
-            new_diary = models.Diary(
+            diary = models.Diary(
                 user_id=data.user_id,
                 content=packaged_content,
-                emotion=main_emotion,
+
+                # Self-Report
+                emotion=data.emotion,
+                emotion_intensity=data.emotion_intensity,
+                secondary_emotion=data.secondary_emotion,
+                secondary_emotion_intensity=(
+                    data.secondary_emotion_intensity
+                ),
+
+                # 루틴
                 routine_name=routine_name,
                 routine_category=routine_category,
                 score_diff=score_diff,
                 is_done=is_done,
-                analysis_comment=analysis_comment,
-                created_at=record_time,
-                **emotions
-            )
-            db.add(new_diary)
 
+                # AI 분석 상태
+                analysis_status="processing",
+                confidence=None,
+                bws_used=False,
+                analysis_completed_at=None,
+                analysis_version=1,
+
+                created_at=datetime.combine(
+                    target_date,
+                    datetime.now().time(),
+                ),
+            )
+
+            db.add(diary)
+
+        from services.situation_keywords import extract_topics
+        diary.keywords = ",".join(extract_topics(actual_main_text))
+        diary.analysis_requested_at = datetime.now(timezone.utc)
+
+        # diary.id 확보
         db.flush()
 
-        # 5. Analysis 테이블 Upsert (중복 생성 방지)
-        existing_analysis = db.query(models.Analysis).filter(
-            models.Analysis.diary_id == new_diary.id
-        ).first()
+        diary_id = diary.id
+        current_version = diary.analysis_version
 
-        if existing_analysis:
-            existing_analysis.emotion = main_emotion
-            existing_analysis.score = emotions.get(main_emotion, 0.0)
-            existing_analysis.feedback = analysis_comment
-        else:
-            new_analysis = models.Analysis(
-                diary_id=new_diary.id,
-                emotion=main_emotion,
-                score=emotions.get(main_emotion, 0.0),
-                feedback=analysis_comment
-            )
-            db.add(new_analysis)
+        # 먼저 DB 저장
+        db.commit()
+        db.refresh(diary)
 
-        # 6. BwsRecord 테이블 저장 (주간 리포트 '복합 감정 데이' 카드 연동)
-        if hasattr(models, "BwsRecord"):
-            # 같은 날짜의 기존 BWS 기록이 있으면 정리 후 재삽입
-            db.query(models.BwsRecord).filter(
-                models.BwsRecord.user_id == data.user_id,
-                func.date(models.BwsRecord.created_at) == target_date
-            ).delete(synchronize_session=False)
+        # -------------------------------------------------
+        # 6. 백그라운드 AI 분석 등록
+        #
+        # 사용자 응답을 기다리게 하지 않고,
+        # FastAPI가 응답한 뒤 실행한다.
+        # -------------------------------------------------
 
-            if analysis.get("bws_used") and analysis.get("bws_validation"):
-                bws_val = analysis["bws_validation"]
-                candidates_list = bws_val.get("candidates", [])
-                candidates_str = ",".join(candidates_list) if isinstance(candidates_list, list) else str(candidates_list)
-
-                bws_kwargs: dict[str, Any] = {
-                    "user_id": data.user_id,
-                    "candidates": candidates_str,
-                    "best_emotion": bws_val.get("best_emotion"),
-                    "worst_emotion": bws_val.get("worst_emotion"),
-                    "reasoning": bws_val.get("reasoning", ""),
-                    "created_at": record_time,
-                }
-                if hasattr(models.BwsRecord, "diary_id"):
-                    bws_kwargs["diary_id"] = new_diary.id
-
-                # models.BwsRecord에 정의된 컬럼만 안전하게 매핑
-                valid_bws_kwargs = {
-                    k: v for k, v in bws_kwargs.items() if hasattr(models.BwsRecord, k)
-                }
-                db.add(models.BwsRecord(**valid_bws_kwargs))
-
-        # 7. 최근 7일 이상징후 체크
-        recent_diaries = (
-            db.query(models.Diary)
-            .filter(models.Diary.user_id == data.user_id)
-            .order_by(models.Diary.created_at.desc())
-            .limit(7)
-            .all()
+        background_tasks.add_task(
+            run_emotion_analysis,
+            diary_id,
+            current_version,
+            actual_main_text,
         )
 
-        emotion_list = [{"emotions": {k: getattr(d, k, 0.0) for k in emotions.keys()}} for d in recent_diaries]
-        alert = check_anomaly_level(emotion_list)
-
-        db.commit()
-        db.refresh(new_diary)
+        # -------------------------------------------------
+        # 7. 즉시 응답
+        # -------------------------------------------------
 
         return {
-            "status": "success",
-            "diary_id": new_diary.id,
-            "dominant_emotion": main_emotion,
-            "bws_used": analysis.get("bws_used", False),
-            "alert": alert
+            "status": "processing",
+            "diary_id": diary_id,
+            "analysis_version": current_version,
+            "message": "감정 분석을 시작했습니다.",
+            "alert": None,
         }
 
     except HTTPException:
@@ -267,51 +497,169 @@ def create_or_update_diary(data: DiaryRequest, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )
 
 
-# --- [4. 월별 일기 불러오기 (GET)] ---
+# =========================================================
+# 감정 분석 상태 조회
+# =========================================================
+
+@router.get("/{diary_id}/analysis-status")
+def get_analysis_status(
+    diary_id: int,
+    db: Session = Depends(get_db),
+):
+    diary = (
+        db.query(models.Diary)
+        .filter(models.Diary.id == diary_id)
+        .first()
+    )
+
+    if not diary:
+        raise HTTPException(
+            status_code=404,
+            detail="일기를 찾을 수 없습니다.",
+        )
+
+    response = {
+        "diary_id": diary.id,
+        "status": diary.analysis_status,
+        "message": diary.analysis_error,
+        "confidence": diary.confidence,
+        "bws_used": diary.bws_used,
+        "analysis_completed_at": diary.analysis_completed_at,
+        "analysis_version": diary.analysis_version,
+    }
+
+    # 완료됐을 때만 최종 8감정 전달
+    if diary.analysis_status == "completed":
+        response["emotions"] = {
+            key: getattr(diary, key, 0.0)
+            for key in EMOTION_KEYS
+        }
+
+    return response
+
+
+# =========================================================
+# 월별 일기 조회
+# =========================================================
+
 @router.get("/monthly")
 def get_monthly_diaries(
     user_id: str,
     year: int = Query(..., example=2026),
     month: int = Query(..., example=5),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    diaries = db.query(models.Diary).filter(
-        models.Diary.user_id == user_id,
-        extract('year', models.Diary.created_at) == year,
-        extract('month', models.Diary.created_at) == month
-    ).order_by(models.Diary.created_at.asc()).all()
+    diaries = (
+        db.query(models.Diary)
+        .filter(
+            models.Diary.user_id == user_id,
+            extract(
+                "year",
+                models.Diary.created_at,
+            ) == year,
+            extract(
+                "month",
+                models.Diary.created_at,
+            ) == month,
+        )
+        .order_by(
+            models.Diary.created_at.asc()
+        )
+        .all()
+    )
 
     return {
         "data": [
             {
-                "date": d.created_at.strftime("%Y-%m-%d"),
-                "emotion": d.emotion or "joy",
-                "content": d.content
-            } for d in diaries
+                "date": d.created_at.strftime(
+                    "%Y-%m-%d"
+                ),
+
+                # Self-Report
+                "emotion": d.emotion,
+                "emotion_intensity": d.emotion_intensity,
+                "secondary_emotion": d.secondary_emotion,
+                "secondary_emotion_intensity": d.secondary_emotion_intensity,
+
+                # 일기 내용
+                "content": d.content,
+
+                # AI 분석 상태
+                "analysis_status": d.analysis_status,
+                "analysis_error": d.analysis_error,
+            }
+            for d in diaries
         ]
     }
 
+# =========================================================
+# 일기 삭제
+# =========================================================
 
-# --- [5. 특정 일기 삭제 (DELETE)] ---
 @router.delete("")
-def delete_diary(user_id: str, date: str, db: Session = Depends(get_db)):
+def delete_diary(
+    user_id: str,
+    date: str,
+    db: Session = Depends(get_db),
+):
     try:
-        target_date = datetime.strptime(date, "%Y-%m-%d").date()
-    except ValueError:
-        raise HTTPException(status_code=400, detail="날짜 형식이 올바르지 않습니다.")
+        target_date = datetime.strptime(
+            date,
+            "%Y-%m-%d",
+        ).date()
 
-    diary_to_delete = db.query(models.Diary).filter(
-        models.Diary.user_id == user_id,
-        func.date(models.Diary.created_at) == target_date
-    ).first()
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="날짜 형식이 올바르지 않습니다.",
+        )
+
+    diary_to_delete = (
+        db.query(models.Diary)
+        .filter(
+            models.Diary.user_id == user_id,
+            func.date(
+                models.Diary.created_at
+            ) == target_date,
+        )
+        .first()
+    )
 
     if not diary_to_delete:
-        raise HTTPException(status_code=404, detail="해당 날짜의 일기가 없습니다.")
+        raise HTTPException(
+            status_code=404,
+            detail="해당 날짜의 일기가 없습니다.",
+        )
 
+    # 기존 Analysis 데이터가 있으면 같이 삭제
+    analysis_rows = (
+        db.query(models.Analysis)
+        .filter(
+            models.Analysis.diary_id
+            == diary_to_delete.id
+        )
+        .all()
+    )
+
+    for row in analysis_rows:
+        db.delete(row)
+
+    db.query(models.BwsRecord).filter(models.BwsRecord.diary_id == diary_to_delete.id).delete(synchronize_session=False)
+    db.query(models.RoutineObservation).filter(
+        (models.RoutineObservation.before_diary_id == diary_to_delete.id) |
+        (models.RoutineObservation.after_diary_id == diary_to_delete.id)
+    ).delete(synchronize_session=False)
+    db.query(models.AnalysisRun).filter(models.AnalysisRun.diary_id == diary_to_delete.id).delete(synchronize_session=False)
     db.delete(diary_to_delete)
     db.commit()
 
-    return {"status": "success"}
+    return {
+        "status": "success"
+    }

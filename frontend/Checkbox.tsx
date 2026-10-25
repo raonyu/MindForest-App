@@ -1,6 +1,5 @@
 import React, { useState, ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
 import { COLORS } from './assets/Maincolors';
 
 interface CheckboxProps {
@@ -15,7 +14,7 @@ const Checkbox = ({initialValue = false, onCheck, onUncheck, children}:CheckboxP
     const checkboxPress = () =>{
         const currentValue = !checked;//체크하면 상태 바뀜
         setchecked(currentValue);
-        
+
         if (currentValue == true){
             onCheck?.();
         }else{
@@ -27,7 +26,7 @@ const Checkbox = ({initialValue = false, onCheck, onUncheck, children}:CheckboxP
             onPress = {checkboxPress}
             style={styles.checkboxContainer}
         >
-            
+
             {children && (
                 <Text
                     style={{marginLeft: 12, flex: 1, fontSize: 12, color: 'black'}}
@@ -39,7 +38,7 @@ const Checkbox = ({initialValue = false, onCheck, onUncheck, children}:CheckboxP
                 </Text>
             )}
             <View style = {[styles.checkboxBase, checked && styles.checkboxChecked]}>
-                {checked && <Ionicons name="checkmark" size={40} color = "black"/>}
+                {checked && <Text style={{fontSize: 32, color: 'black'}}>✓</Text>}
             </View>
         </Pressable>
     )

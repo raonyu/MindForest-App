@@ -1,10 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  View, Text, StyleSheet, TouchableOpacity,
-  TextInput, Platform, ScrollView, Alert, Image, Dimensions,
-  ImageBackground, Keyboard, Modal, Animated
-} from 'react-native';
-import { launchImageLibrary } from 'react-native-image-picker'; 
+import { notify } from './notify';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Platform, ScrollView, Image, Dimensions, ImageBackground, Keyboard, Modal, Animated } from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { useMainContext } from './MainContext';
 import { API_BASE_URL } from './config';
 
@@ -18,30 +15,32 @@ const DiaryScreen = () => {
 
   const realToday = new Date();
   const [currentDateObj, setCurrentDateObj] = useState(new Date());
-  
+
   const currentYear = currentDateObj.getFullYear();
   const currentMonth = currentDateObj.getMonth() + 1;
   const isCurrentMonth = currentYear === realToday.getFullYear() && currentMonth === realToday.getMonth() + 1;
 
   const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
   const firstDayOfMonth = new Date(currentYear, currentMonth - 1, 1).getDay();
-  const calendarDays = Array.from({ length: daysInMonth + firstDayOfMonth }, (_, i) => 
+  const calendarDays = Array.from({ length: daysInMonth + firstDayOfMonth }, (_, i) =>
     i >= firstDayOfMonth ? i - firstDayOfMonth + 1 : null
   );
 
   const [diaries, setDiaries] = useState<Record<string, any>>({});
   const [selectedDate, setSelectedDate] = useState<number | null>(isCurrentMonth ? realToday.getDate() : null);
-  
+
   const [isEmotionModalVisible, setIsEmotionModalVisible] = useState<boolean>(false);
 
   // 감정 선택 시트: 시트는 아래에서 올라오고, 어두운 배경은 투명도로만 나타나게 한다.
   const SHEET_TRAVEL = 360;
+  const sheetMounted = useRef(false);
   const [isSheetMounted, setIsSheetMounted] = useState<boolean>(false);
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const sheetTranslateY = useRef(new Animated.Value(SHEET_TRAVEL)).current;
 
   useEffect(() => {
     if (isEmotionModalVisible) {
+      sheetMounted.current = true;
       setIsSheetMounted(true);
       backdropOpacity.setValue(0);
       sheetTranslateY.setValue(SHEET_TRAVEL);
@@ -59,23 +58,28 @@ const DiaryScreen = () => {
       return;
     }
 
-    if (!isSheetMounted) return;
+    if (!sheetMounted.current) return;
     // 닫을 때도 배경은 서서히 사라지고 시트는 내려간다.
     Animated.parallel([
       Animated.timing(backdropOpacity, { toValue: 0, duration: 180, useNativeDriver: true }),
       Animated.timing(sheetTranslateY, { toValue: SHEET_TRAVEL, duration: 180, useNativeDriver: true }),
-    ]).start(() => setIsSheetMounted(false));
-  }, [isEmotionModalVisible]);
+    ]).start(() => { sheetMounted.current = false; setIsSheetMounted(false); });
+  }, [isEmotionModalVisible, backdropOpacity, sheetTranslateY]);
   const [isDakkuMode, setIsDakkuMode] = useState<boolean>(false);
+
+  // Self-Report
   const [tempEmotion, setTempEmotion] = useState<string | null>(null);
-  
-  const [bgColor, setBgColor] = useState<any>(BACKGROUNDS[0]); 
-  const [mainText, setMainText] = useState<string>(''); 
+  const [tempEmotionIntensity, setTempEmotionIntensity] = useState<number | null>(null);
+  const [secondaryEmotion, setSecondaryEmotion] = useState<string | null>(null);
+  const [secondaryEmotionIntensity, setSecondaryEmotionIntensity] = useState<number | null>(null);
+
+  const [bgColor, setBgColor] = useState<any>(BACKGROUNDS[0]);
+  const [mainText, setMainText] = useState<string>('');
   const [currentFont, setCurrentFont] = useState<string>('System');
 
   const [elements, setElements] = useState<any[]>([]);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
-  
+
   const [activeTray, setActiveTray] = useState<string | null>(null);
   const [activeStickerCategory, setActiveStickerCategory] = useState<string>('생일/파티');
 
@@ -85,7 +89,7 @@ const DiaryScreen = () => {
     return days[date.getDay()];
   };
 
-  const fetchMonthlyDiaries = async () => {
+  const fetchMonthlyDiaries = useCallback(async () => {
     if (!user?.user_id) return;
     try {
       const response = await fetch(`${API_BASE_URL}/api/diary/monthly?user_id=${user.user_id}&year=${currentYear}&month=${currentMonth}`);
@@ -94,7 +98,15 @@ const DiaryScreen = () => {
         const loadedDiaries: Record<string, any> = {};
         if (result.data) {
           result.data.forEach((item: any) => {
-            loadedDiaries[item.date] = { emotion: item.emotion, text: item.content };
+            loadedDiaries[item.date] = {
+              emotion: item.emotion,
+              emotion_intensity: item.emotion_intensity ?? null,
+              secondary_emotion: item.secondary_emotion ?? null,
+              secondary_emotion_intensity: item.secondary_emotion_intensity ?? null,
+              analysis_status: item.analysis_status ?? null,
+              analysis_error: item.analysis_error ?? null,
+              text: item.content
+            };
           });
         }
         setDiaries(loadedDiaries);
@@ -102,11 +114,15 @@ const DiaryScreen = () => {
     } catch (error) {
       console.error("일기 불러오기 실패:", error);
     }
-  };
-
-  useEffect(() => {
-    fetchMonthlyDiaries();
   }, [currentYear, currentMonth, user?.user_id]);
+
+  useEffect(() => { fetchMonthlyDiaries(); }, [fetchMonthlyDiaries]);
+  const processing = Object.values(diaries).some(d => d.analysis_status === 'processing');
+  useEffect(() => {
+    if (!processing) return;
+    const timer = setInterval(() => { fetchMonthlyDiaries(); }, 2500);
+    return () => clearInterval(timer);
+  }, [processing, fetchMonthlyDiaries]);
 
   const goToPrevMonth = () => { setCurrentDateObj(new Date(currentYear, currentMonth - 2, 1)); setSelectedDate(null); };
   const goToNextMonth = () => { setCurrentDateObj(new Date(currentYear, currentMonth, 1)); setSelectedDate(null); };
@@ -115,13 +131,16 @@ const DiaryScreen = () => {
     setSelectedDate(day);
     const mm = String(currentMonth).padStart(2, '0');
     const dd = String(day).padStart(2, '0');
-    const dateKey = `${currentYear}-${mm}-${dd}`; 
+    const dateKey = `${currentYear}-${mm}-${dd}`;
     const existingDiary = diaries[dateKey];
-    
+
     setActiveTray(null);
 
     if (existingDiary) {
       setTempEmotion(existingDiary.emotion);
+      setTempEmotionIntensity(existingDiary.emotion_intensity ?? null);
+      setSecondaryEmotion(existingDiary.secondary_emotion ?? null);
+      setSecondaryEmotionIntensity(existingDiary.secondary_emotion_intensity ?? null);
       try {
         const parsedData = JSON.parse(existingDiary.text);
         if (parsedData.elements !== undefined) {
@@ -137,21 +156,58 @@ const DiaryScreen = () => {
         setMainText(existingDiary.text);
         setElements([]);
       }
-      setIsDakkuMode(true); 
+      setIsDakkuMode(true);
     } else {
       setTempEmotion(null);
+      setTempEmotionIntensity(null);
+      setSecondaryEmotion(null);
+      setSecondaryEmotionIntensity(null);
       setMainText('');
       setCurrentFont('System');
       setElements([]);
-      setBgColor(BACKGROUNDS[0]); 
-      setIsEmotionModalVisible(true); 
+      setBgColor(BACKGROUNDS[0]);
+      setIsEmotionModalVisible(true);
     }
   };
 
   const handleEmotionSelect = (emotionId: string) => {
     setTempEmotion(emotionId);
+    setTempEmotionIntensity(null);
+
+    // 같은 감정을 1, 2순위에 동시에 저장하지 않음
+    if (secondaryEmotion === emotionId) {
+      setSecondaryEmotion(null);
+      setSecondaryEmotionIntensity(null);
+    }
+  };
+
+  const handleSecondaryEmotionSelect = (emotionId: string) => {
+    if (emotionId === tempEmotion) return;
+
+    if (secondaryEmotion === emotionId) {
+      // 다시 누르면 두 번째 감정 선택 해제
+      setSecondaryEmotion(null);
+      setSecondaryEmotionIntensity(null);
+      return;
+    }
+
+    setSecondaryEmotion(emotionId);
+    setSecondaryEmotionIntensity(null);
+  };
+
+  const completeSelfReportSelection = () => {
+    if (!tempEmotion || !tempEmotionIntensity) {
+      notify("안내", "첫 번째 감정과 강도를 선택해주세요.");
+      return;
+    }
+
+    if (secondaryEmotion && !secondaryEmotionIntensity) {
+      notify("안내", "두 번째 감정의 강도도 선택해주세요.");
+      return;
+    }
+
     setIsEmotionModalVisible(false);
-    
+
     if (!isDakkuMode) {
       setTimeout(() => {
         setIsDakkuMode(true);
@@ -160,11 +216,18 @@ const DiaryScreen = () => {
   };
 
   const handleSaveDiary = async () => {
-    if (!tempEmotion) {
-      Alert.alert("안내", "먼저 오늘의 감정을 선택해주세요.");
+    if (!tempEmotion || !tempEmotionIntensity) {
+      notify("안내", "오늘의 감정과 강도를 선택해주세요.");
+      setIsEmotionModalVisible(true);
       return;
     }
-    
+
+    if (secondaryEmotion && !secondaryEmotionIntensity) {
+      notify("안내", "두 번째 감정의 강도를 선택해주세요.");
+      setIsEmotionModalVisible(true);
+      return;
+    }
+
     const mm = String(currentMonth).padStart(2, '0');
     const dd = String(selectedDate).padStart(2, '0');
     const dateKey = `${currentYear}-${mm}-${dd}`;
@@ -176,7 +239,13 @@ const DiaryScreen = () => {
         body: JSON.stringify({
           user_id: user.user_id,
           date: dateKey,
+
+          // Self-Report는 AI 결과와 섞지 않고 별도 저장
           emotion: tempEmotion,
+          emotion_intensity: tempEmotionIntensity,
+          secondary_emotion: secondaryEmotion,
+          secondary_emotion_intensity: secondaryEmotionIntensity,
+
           main_text: mainText,
           bg_color_id: bgColor.id,
           font: currentFont,
@@ -185,26 +254,50 @@ const DiaryScreen = () => {
       });
 
       if (response.ok) {
-        const dakkuData = JSON.stringify({ bgColorId: bgColor.id, mainText, font: currentFont, elements });
-        setDiaries(prev => ({ ...prev, [dateKey]: { emotion: tempEmotion, text: dakkuData } }));
+        const result = await response.json();
+
+        const dakkuData = JSON.stringify({
+          bgColorId: bgColor.id,
+          mainText,
+          font: currentFont,
+          elements
+        });
+
+        setDiaries(prev => ({
+          ...prev,
+          [dateKey]: {
+            emotion: tempEmotion,
+            emotion_intensity: tempEmotionIntensity,
+            secondary_emotion: secondaryEmotion,
+            secondary_emotion_intensity: secondaryEmotionIntensity,
+            analysis_status: result.status,
+            text: dakkuData
+          }
+        }));
+
         setIsDakkuMode(false);
+
+        notify(
+  "저장 완료",
+  "일기는 저장되었습니다.\n숲지기가 감정을 분석하고 있어요 🌿"
+);
       } else {
-        Alert.alert("오류", "서버 저장에 실패했습니다.");
+        notify("오류", "서버 저장에 실패했습니다.");
       }
-    } catch (error) {
-      Alert.alert("오류", "서버와 연결할 수 없습니다.");
+    } catch  {
+      notify("오류", "서버와 연결할 수 없습니다.");
     }
   };
 
   const handleDeleteDiary = () => {
-    Alert.alert("일기 지우기", "이 날의 기록을 지울까요?", [
+    notify("일기 지우기", "이 날의 기록을 지울까요?", [
       { text: "취소", style: "cancel" },
-      { 
+      {
         text: "지우기", style: "destructive",
         onPress: async () => {
           const mm = String(currentMonth).padStart(2, '0');
           const dd = String(selectedDate).padStart(2, '0');
-          const dateKey = `${currentYear}-${mm}-${dd}`; 
+          const dateKey = `${currentYear}-${mm}-${dd}`;
           try {
             const response = await fetch(`${API_BASE_URL}/api/diary?user_id=${user.user_id}&date=${dateKey}`, { method: 'DELETE' });
             if (response.ok) {
@@ -213,35 +306,35 @@ const DiaryScreen = () => {
               setDiaries(newDiaries);
               setIsDakkuMode(false);
             }
-          } catch (error) { Alert.alert("오류", "서버와 연결할 수 없습니다."); }
+          } catch  { notify("오류", "서버와 연결할 수 없습니다."); }
         }
       }
     ]);
   };
 
   const addSticker = (sticker: any) => {
-    setElements([...elements, { 
-      id: Date.now().toString(), 
-      type: 'sticker', 
-      stickerType: sticker.type, 
+    setElements([...elements, {
+      id: Date.now().toString(),
+      type: 'sticker',
+      stickerType: sticker.type,
       content: sticker.type === 'text' ? sticker.content : null,
       source: sticker.type === 'image' ? sticker.source : null,
-      size: sticker.type === 'image' ? 70 : 50, 
-      x: 100, y: 150 
+      size: sticker.type === 'image' ? 70 : 50,
+      x: 100, y: 150
     }]);
     setActiveTray(null);
   };
 
   const addHighlighter = (hl: any) => {
-    setElements([...elements, { 
-      id: Date.now().toString(), 
-      type: 'highlighter', 
-      color: hl.color || null, 
+    setElements([...elements, {
+      id: Date.now().toString(),
+      type: 'highlighter',
+      color: hl.color || null,
       texture: hl.texture || null,
       highlighterType: hl.type,
       design: hl.design || null,
-      size: 140, 
-      x: 50, y: 150 
+      size: 140,
+      x: 50, y: 150
     }]);
     setActiveTray(null);
   };
@@ -277,28 +370,144 @@ const DiaryScreen = () => {
         </Animated.View>
 
         <Animated.View style={[styles.emotionModalContainer, { transform: [{ translateY: sheetTranslateY }] }]}>
+
+          <ScrollView style={{width: "100%"}} contentContainerStyle={{alignItems: "center"}} keyboardShouldPersistTaps="handled">
           <View style={styles.modalDragHandle} />
+
           <Text style={styles.modalDateText}>
-            {currentYear}.{String(currentMonth).padStart(2, '0')}.{String(selectedDate).padStart(2, '0')} {selectedDate ? getDayOfWeek(currentYear, currentMonth, selectedDate) : ''}
+            {currentYear}.{String(currentMonth).padStart(2, '0')}.{String(selectedDate).padStart(2, '0')}{' '}
+            {selectedDate ? getDayOfWeek(currentYear, currentMonth, selectedDate) : ''}
           </Text>
-          <Text style={styles.modalTitleText}>오늘은 어떤 하루였나요?</Text>
-          
+
+          <Text style={styles.modalTitleText}>
+            오늘 느낀 감정을 알려주세요
+          </Text>
+
+          <Text style={styles.selfReportSectionTitle}>첫 번째 감정</Text>
+
           <View style={styles.modalEmotionGrid}>
             {EMOTIONS.map((emo: any) => {
               const EmotionIcon = emo.icon;
+              const selected = tempEmotion === emo.id;
+
               return (
-                <TouchableOpacity 
-                  key={emo.id} 
-                  style={styles.modalEmotionItem}
+                <TouchableOpacity
+                  key={`primary-${emo.id}`}
+                  style={[
+                    styles.modalEmotionItem,
+                    selected && styles.selectedEmotionItem
+                  ]}
                   onPress={() => handleEmotionSelect(emo.id)}
                 >
-                  <EmotionIcon width={55} height={55} />
+                  <EmotionIcon width={46} height={46} />
+                  <Text style={styles.emotionNameText}>{emo.name}</Text>
                 </TouchableOpacity>
               );
             })}
           </View>
+
+          {tempEmotion && (
+            <>
+              <Text style={styles.intensityTitle}>강도</Text>
+              <View style={styles.intensityRow}>
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <TouchableOpacity
+                    key={`primary-intensity-${value}`}
+                    style={[
+                      styles.intensityButton,
+                      tempEmotionIntensity === value && styles.selectedIntensityButton
+                    ]}
+                    onPress={() => setTempEmotionIntensity(value)}
+                  >
+                    <Text
+                      style={[
+                        styles.intensityButtonText,
+                        tempEmotionIntensity === value && styles.selectedIntensityButtonText
+                      ]}
+                    >
+                      {value}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
+
+          <View style={styles.secondaryDivider} />
+
+          <Text style={styles.selfReportSectionTitle}>
+            두 번째 감정 <Text style={styles.optionalText}>(선택)</Text>
+          </Text>
+
+          <View style={styles.modalEmotionGrid}>
+            {EMOTIONS.map((emo: any) => {
+              const EmotionIcon = emo.icon;
+              const selected = secondaryEmotion === emo.id;
+              const disabled = tempEmotion === emo.id;
+
+              return (
+                <TouchableOpacity
+                  key={`secondary-${emo.id}`}
+                  disabled={disabled}
+                  style={[
+                    styles.modalEmotionItem,
+                    selected && styles.selectedEmotionItem,
+                    disabled && styles.disabledEmotionItem
+                  ]}
+                  onPress={() => handleSecondaryEmotionSelect(emo.id)}
+                >
+                  <EmotionIcon width={42} height={42} />
+                  <Text style={styles.emotionNameText}>{emo.name}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {secondaryEmotion && (
+            <>
+              <Text style={styles.intensityTitle}>두 번째 감정 강도</Text>
+              <View style={styles.intensityRow}>
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <TouchableOpacity
+                    key={`secondary-intensity-${value}`}
+                    style={[
+                      styles.intensityButton,
+                      secondaryEmotionIntensity === value && styles.selectedIntensityButton
+                    ]}
+                    onPress={() => setSecondaryEmotionIntensity(value)}
+                  >
+                    <Text
+                      style={[
+                        styles.intensityButtonText,
+                        secondaryEmotionIntensity === value && styles.selectedIntensityButtonText
+                      ]}
+                    >
+                      {value}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
+
+          <TouchableOpacity
+            style={[
+              styles.emotionCompleteButton,
+              (!tempEmotion ||
+                !tempEmotionIntensity ||
+                (secondaryEmotion && !secondaryEmotionIntensity)) &&
+                styles.emotionCompleteButtonDisabled
+            ]}
+            onPress={completeSelfReportSelection}
+          >
+            <Text style={styles.emotionCompleteButtonText}>
+              선택 완료
+            </Text>
+          </TouchableOpacity>
+          </ScrollView>
         </Animated.View>
       </View>
+
     </Modal>
   );
 
@@ -309,71 +518,90 @@ const DiaryScreen = () => {
 
     return (
       <View style={styles.dakkuContainer}>
-        
+
         {renderEmotionModal()}
 
         <View style={styles.dakkuHeader}>
           <TouchableOpacity style={styles.headerLeftBtn} onPress={() => setIsDakkuMode(false)}>
             <Text style={styles.headerArrow}>◀</Text>
           </TouchableOpacity>
-          
+
           <View style={styles.headerCenterContent}>
             <TouchableOpacity activeOpacity={0.7} onPress={() => setIsEmotionModalVisible(true)}>
               {SelectedEmotionIcon && <SelectedEmotionIcon width={45} height={45} style={{ marginBottom: 5 }} />}
             </TouchableOpacity>
-            
+
             <Text style={styles.headerCenterDate}>
               {currentYear}.{String(currentMonth).padStart(2, '0')}.{String(selectedDate).padStart(2, '0')} {dayOfWeek}
             </Text>
           </View>
-          
+
           <TouchableOpacity style={styles.headerRightBtn} onPress={handleSaveDiary}>
             <Text style={styles.headerSaveText}>저장</Text>
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity 
-          activeOpacity={1} 
-          style={[styles.canvas, bgColor.id === 'grid' ? { backgroundColor: '#ffffff' } : { backgroundColor: bgColor.color }]} 
-          onPress={() => { 
-            setSelectedElementId(null); 
-            setActiveTray(null); 
-            Keyboard.dismiss(); 
-          }}
+        {selectedDate && (() => {
+          const key = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(selectedDate).padStart(2, '0')}`;
+          const entry = diaries[key];
+          return entry?.analysis_status === 'processing' ? <Text style={{padding: 10}}>일기는 저장됐어요. 감정을 분석하고 있어요.</Text> :
+            entry?.analysis_status === 'failed' ? <Text style={{padding: 10}}>{entry.analysis_error || '일기는 저장됐지만 AI 분석을 완료하지 못했어요.'}</Text> : null;
+        })()}
+        <View
+          style={[
+            styles.canvas,
+            bgColor.id === 'grid'
+              ? { backgroundColor: '#ffffff' }
+              : { backgroundColor: bgColor.color }
+          ]}
         >
           {bgColor.id === 'grid' && (
-            <View style={StyleSheet.absoluteFill}>
-              {Array.from({ length: Math.ceil(SCREEN_WIDTH / 26) }).map((_, i) => <View key={`v-${i}`} style={[styles.gridLineV, { left: i * 26 }]} />)}
-              {Array.from({ length: Math.ceil(SCREEN_HEIGHT / 26) }).map((_, i) => <View key={`h-${i}`} style={[styles.gridLineH, { top: i * 26 }]} />)}
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
+              {Array.from({ length: Math.ceil(SCREEN_WIDTH / 26) }).map((_, i) => (
+                <View key={`v-${i}`} style={[styles.gridLineV, { left: i * 26 }]} />
+              ))}
+              {Array.from({ length: Math.ceil(SCREEN_HEIGHT / 26) }).map((_, i) => (
+                <View key={`h-${i}`} style={[styles.gridLineH, { top: i * 26 }]} />
+              ))}
             </View>
           )}
 
-          <TextInput 
-            style={[styles.mainTextInput, { fontFamily: currentFont === 'System' ? undefined : currentFont }]} 
-            multiline={true} 
-            textAlignVertical="top" 
-            value={mainText} 
-            onChangeText={setMainText} 
-            placeholder="화면을 터치해 일기를 작성해보세요..." 
+          <TextInput
+            style={[
+              styles.mainTextInput,
+              { fontFamily: currentFont === 'System' ? undefined : currentFont }
+            ]}
+            multiline={true}
+            textAlignVertical="top"
+            value={mainText}
+            onChangeText={setMainText}
+            placeholder="화면을 터치해 일기를 작성해보세요..."
             placeholderTextColor="#b4b4b4"
             blurOnSubmit={false}
             autoCapitalize="none"
             autoComplete="off"
             autoCorrect={false}
             spellCheck={false}
-            editable={selectedElementId === null} 
+            editable={true}
+            onFocus={() => {
+              setSelectedElementId(null);
+              setActiveTray(null);
+            }}
           />
 
-          <View style={[StyleSheet.absoluteFill, { zIndex: 10 }]} pointerEvents="box-none">
+          <View
+            style={[StyleSheet.absoluteFill, { zIndex: 10 }]}
+            pointerEvents="box-none"
+          >
             {elements.map((el, index) => {
               const isSelected = selectedElementId === el.id;
-              const currentZIndex = 100 + index; 
-              
+              const currentZIndex = 100 + index;
+
               if (el.type === 'sticker') {
                 return (
-                  <ResizableElement 
-                    key={el.id} 
-                    el={el} 
+                  <ResizableElement
+                    key={el.id}
+                    el={el}
                     isSelected={isSelected}
                     onSelect={setSelectedElementId}
                     onUpdate={updateElement}
@@ -384,67 +612,117 @@ const DiaryScreen = () => {
               }
 
               return (
-                <TouchableOpacity 
-                  key={el.id} activeOpacity={0.9} 
+                <TouchableOpacity
+                  key={el.id}
+                  activeOpacity={0.9}
                   onPress={() => {
                     setSelectedElementId(el.id);
-                    Keyboard.dismiss(); 
+                    Keyboard.dismiss();
                   }}
                   style={[
-                    styles.elementWrapper, 
-                    { top: el.y !== undefined ? el.y : 0, left: el.x !== undefined ? el.x : 0, zIndex: currentZIndex },
+                    styles.elementWrapper,
+                    {
+                      top: el.y !== undefined ? el.y : 0,
+                      left: el.x !== undefined ? el.x : 0,
+                      zIndex: currentZIndex
+                    },
                     isSelected && styles.selectedElement
                   ]}
                 >
                   {el.type === 'polaroid' && (
                     <View style={styles.polaroidFrame}>
-                      <Image source={{ uri: el.uri }} style={{ width: el.size, height: el.size }} />
+                      <Image
+                        source={{ uri: el.uri }}
+                        style={{ width: el.size, height: el.size }}
+                      />
                       <Text style={styles.polaroidCaption}>Photo</Text>
                     </View>
                   )}
-                  
+
                   {el.type === 'highlighter' && (
                     el.highlighterType === 'pattern' ? (
-                      <ImageBackground source={el.texture} style={[styles.highlighterDeco, { width: el.size }]} imageStyle={{ opacity: 0.65 }} resizeMode="repeat" />
+                      <ImageBackground
+                        source={el.texture}
+                        style={[styles.highlighterDeco, { width: el.size }]}
+                        imageStyle={{ opacity: 0.65 }}
+                        resizeMode="repeat"
+                      />
                     ) : (
-                      <View style={[styles.highlighterDeco, { width: el.size, backgroundColor: el.color }]} />
+                      <View
+                        style={[
+                          styles.highlighterDeco,
+                          { width: el.size, backgroundColor: el.color }
+                        ]}
+                      />
                     )
                   )}
 
                   {isSelected && (
                     <>
-                      {/* 확인 버튼: 파란 배경에 하얀 글씨 */}
-                      <TouchableOpacity style={[styles.controlCircleBtn, styles.cornerConfirm]} onPress={() => setSelectedElementId(null)}>
+                      <TouchableOpacity
+                        style={[styles.controlCircleBtn, styles.cornerConfirm]}
+                        onPress={() => setSelectedElementId(null)}
+                      >
                         <Text style={[styles.controlText, { color: 'white' }]}>O</Text>
                       </TouchableOpacity>
-                      
-                      {/* 확대 버튼 (+) */}
-                      <TouchableOpacity style={[styles.controlCircleBtn, styles.cornerResize]} onPress={() => updateElement(el.id, { size: el.size + 10 })}>
+
+                      <TouchableOpacity
+                        style={[styles.controlCircleBtn, styles.cornerResize]}
+                        onPress={() => updateElement(el.id, { size: el.size + 10 })}
+                      >
                         <Text style={[styles.controlText, { fontSize: 16 }]}>+</Text>
                       </TouchableOpacity>
-                      
-                      {/* 축소 버튼 (-) */}
-                      <TouchableOpacity style={[styles.controlCircleBtn, styles.cornerShrink]} onPress={() => updateElement(el.id, { size: Math.max(20, el.size - 10) })}>
+
+                      <TouchableOpacity
+                        style={[styles.controlCircleBtn, styles.cornerShrink]}
+                        onPress={() =>
+                          updateElement(el.id, { size: Math.max(20, el.size - 10) })
+                        }
+                      >
                         <Text style={[styles.controlText, { fontSize: 16 }]}>-</Text>
                       </TouchableOpacity>
-                      
-                      {/* 삭제 버튼 (X) */}
-                      <TouchableOpacity style={[styles.controlCircleBtn, styles.cornerDelete]} onPress={() => removeElement(el.id)}>
+
+                      <TouchableOpacity
+                        style={[styles.controlCircleBtn, styles.cornerDelete]}
+                        onPress={() => removeElement(el.id)}
+                      >
                         <Text style={[styles.controlText, { color: 'white' }]}>X</Text>
                       </TouchableOpacity>
-                      
-                      {/* 방향키 버튼 바 */}
+
                       <View style={styles.moveControlBar}>
-                        <TouchableOpacity style={styles.moveArrowBtn} onPress={() => updateElement(el.id, { y: (el.y || 0) - 5 })}>
+                        <TouchableOpacity
+                          style={styles.moveArrowBtn}
+                          onPress={() =>
+                            updateElement(el.id, { y: (el.y || 0) - 5 })
+                          }
+                        >
                           <Text style={styles.moveArrowText}>▲</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.moveArrowBtn} onPress={() => updateElement(el.id, { y: (el.y || 0) + 5 })}>
+
+                        <TouchableOpacity
+                          style={styles.moveArrowBtn}
+                          onPress={() =>
+                            updateElement(el.id, { y: (el.y || 0) + 5 })
+                          }
+                        >
                           <Text style={styles.moveArrowText}>▼</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.moveArrowBtn} onPress={() => updateElement(el.id, { x: (el.x || 0) - 5 })}>
+
+                        <TouchableOpacity
+                          style={styles.moveArrowBtn}
+                          onPress={() =>
+                            updateElement(el.id, { x: (el.x || 0) - 5 })
+                          }
+                        >
                           <Text style={styles.moveArrowText}>◀</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.moveArrowBtn} onPress={() => updateElement(el.id, { x: (el.x || 0) + 5 })}>
+
+                        <TouchableOpacity
+                          style={styles.moveArrowBtn}
+                          onPress={() =>
+                            updateElement(el.id, { x: (el.x || 0) + 5 })
+                          }
+                        >
                           <Text style={styles.moveArrowText}>▶</Text>
                         </TouchableOpacity>
                       </View>
@@ -454,23 +732,23 @@ const DiaryScreen = () => {
               );
             })}
           </View>
-        </TouchableOpacity>
+        </View>
 
         {activeTray === 'font' && (
           <View style={styles.trayContainer} onStartShouldSetResponder={() => true}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} nestedScrollEnabled={true}>
               {FONTS.map((font: any) => (
-                <TouchableOpacity 
-                  key={font.id} 
-                  onPress={() => applyFontToSelected(font.id)} 
+                <TouchableOpacity
+                  key={font.id}
+                  onPress={() => applyFontToSelected(font.id)}
                   style={[styles.fontItem, currentFont === font.id && styles.selectedFontItem]}
                 >
-                  <Text style={{ 
-                    fontFamily: font.id === 'System' ? undefined : font.id, 
+                  <Text style={{
+                    fontFamily: font.id === 'System' ? undefined : font.id,
                     fontSize: 16,
                     includeFontPadding: false,
                     textAlignVertical: 'center',
-                    color: currentFont === font.id ? '#2a3a21' : '#555' 
+                    color: currentFont === font.id ? '#2a3a21' : '#555'
                   }}>
                     {font.name}
                   </Text>
@@ -485,20 +763,20 @@ const DiaryScreen = () => {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 15 }} nestedScrollEnabled={true}>
               <View style={styles.categoryRow}>
                 {Object.keys(STICKER_CATEGORIES).map((cat: string) => (
-                  <TouchableOpacity 
-                    key={cat} 
-                    onPress={() => setActiveStickerCategory(cat)} 
+                  <TouchableOpacity
+                    key={cat}
+                    onPress={() => setActiveStickerCategory(cat)}
                     style={[styles.categoryBtn, activeStickerCategory === cat && styles.activeCategoryBtn]}
                   >
                     <Text style={[
-                      styles.categoryBtnText, 
+                      styles.categoryBtnText,
                       activeStickerCategory === cat && styles.activeCategoryBtnText
                     ]}>{cat}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </ScrollView>
-            
+
             <ScrollView horizontal showsHorizontalScrollIndicator={false} nestedScrollEnabled={true}>
               {STICKER_CATEGORIES[activeStickerCategory as keyof typeof STICKER_CATEGORIES].map((sticker: any, idx: number) => (
                 <TouchableOpacity key={sticker.id || idx} onPress={() => addSticker(sticker)} style={styles.stickerItem}>
@@ -534,10 +812,10 @@ const DiaryScreen = () => {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.bgSelector} nestedScrollEnabled={true}>
             {BACKGROUNDS.map((bg: any, idx: number) => (
               <TouchableOpacity key={idx} onPress={() => setBgColor(bg)} style={[
-                  styles.bgCircle, 
+                  styles.bgCircle,
                   bg.id === 'grid' ? styles.gridPreview : { backgroundColor: bg.color },
                   bgColor.id === bg.id && { borderWidth: 2, borderColor: '#98cbf1' }
-                ]} 
+                ]}
               />
             ))}
           </ScrollView>
@@ -557,7 +835,7 @@ const DiaryScreen = () => {
 
   return (
     <View style={styles.container}>
-      
+
       {renderEmotionModal()}
 
       <View style={styles.notebookContainer}>
@@ -602,15 +880,17 @@ const DiaryScreen = () => {
               const dd = String(day).padStart(2, '0');
               const dateKey = day !== null ? `${currentYear}-${mm}-${dd}` : '';
               const diaryEntry = day !== null ? diaries[dateKey] : null;
-              
+
               const isToday = day !== null && isCurrentMonth && day === realToday.getDate();
               const isSelected = day !== null && day === selectedDate;
               const emotionObj = diaryEntry ? EMOTIONS.find((e: any) => e.id === diaryEntry.emotion) : null;
               const EmotionIcon = emotionObj ? emotionObj.icon : null;
 
               return (
-                <TouchableOpacity 
-                  key={index} 
+                <TouchableOpacity
+                  key={index}
+                  accessibilityRole="button"
+                  accessibilityLabel={day === null ? undefined : `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')} 일기`}
                   style={[styles.dayCell, (isToday && !diaryEntry) ? styles.todayCell : null, (isSelected && !isToday && !diaryEntry) ? styles.selectedCell : null]}
                   onPress={() => day !== null && handleDayPress(day)}
                   disabled={day === null}
@@ -670,24 +950,123 @@ const styles = StyleSheet.create({
     marginBottom: -40,
     paddingBottom: (Platform.OS === 'ios' ? 40 : 25) + 40,
   },
+
   modalDragHandle: { width: 40, height: 4, backgroundColor: '#555', borderRadius: 2, marginBottom: 20 },
   modalDateText: { fontSize: 13, color: '#999', marginBottom: 8 },
   modalTitleText: { fontSize: 18, color: '#ffffff', fontWeight: 'bold', marginBottom: 30 },
 
   // 💡 수정된 부분: 이모지가 9개(또는 그 이상)가 되어도 예쁘게 줄바꿈되도록 수정
-  modalEmotionGrid: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
-    justifyContent: 'center', 
+  modalEmotionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: 15, // 이모지 사이의 간격
     width: '100%' // 그리드가 꽉 차게 해서 균형을 맞춤
   },
 
-  modalEmotionItem: { 
-    padding: 10, 
-    // 💡 화면 넓이에 맞춰 한 줄에 3~4개씩 적절히 들어가도록 여백 조정
-    marginHorizontal: 5, 
-    marginBottom: 10 
+  modalEmotionItem: {
+    padding: 8,
+    marginHorizontal: 3,
+    marginBottom: 8,
+    minWidth: 70,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+    borderRadius: 14,
+  },
+
+  selectedEmotionItem: {
+    borderColor: '#acff80',
+    backgroundColor: '#3a4635',
+  },
+
+  disabledEmotionItem: {
+    opacity: 0.25,
+  },
+
+  emotionNameText: {
+    marginTop: 4,
+    color: '#ffffff',
+    fontSize: 12,
+  },
+
+  selfReportSectionTitle: {
+    width: '100%',
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginTop: 4,
+    marginBottom: 8,
+  },
+
+  optionalText: {
+    color: '#999999',
+    fontSize: 12,
+    fontWeight: 'normal',
+  },
+
+  intensityTitle: {
+    color: '#cccccc',
+    fontSize: 13,
+    marginTop: 4,
+    marginBottom: 8,
+  },
+
+  intensityRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+
+  intensityButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: '#666666',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  selectedIntensityButton: {
+    backgroundColor: '#acff80',
+    borderColor: '#acff80',
+  },
+
+  intensityButtonText: {
+    color: '#ffffff',
+    fontWeight: 'bold',
+  },
+
+  selectedIntensityButtonText: {
+    color: '#1f2b18',
+  },
+
+  secondaryDivider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: '#444444',
+    marginVertical: 8,
+  },
+
+  emotionCompleteButton: {
+    width: '100%',
+    paddingVertical: 13,
+    borderRadius: 12,
+    backgroundColor: '#acff80',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+
+  emotionCompleteButtonDisabled: {
+    opacity: 0.35,
+  },
+
+  emotionCompleteButtonText: {
+    color: '#1f2b18',
+    fontSize: 15,
+    fontWeight: 'bold',
   },
 
   dakkuContainer: { flex: 1, backgroundColor: '#f9f9f9', paddingTop: Platform.OS === 'ios' ? 50 : 20 },
@@ -699,7 +1078,7 @@ const styles = StyleSheet.create({
   headerCenterContent: { alignItems: 'center', justifyContent: 'center' },
   headerCenterDate: { fontSize: 13, color: '#777' },
 
-  canvas: { flex: 1, position: 'relative', overflow: 'hidden' }, 
+  canvas: { flex: 1, position: 'relative', overflow: 'hidden' },
   gridCanvas: { backgroundColor: '#ffffff', borderColor: '#e0e0e0', borderWidth: 2, borderStyle: 'dashed' },
   gridLineV: { position: 'absolute', top: 0, bottom: 0, width: 1, backgroundColor: 'rgba(215, 215, 215, 0.45)' },
   gridLineH: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: 'rgba(215, 215, 215, 0.45)' },
@@ -714,18 +1093,18 @@ const styles = StyleSheet.create({
 
   elementWrapper: { position: 'absolute', padding: 5, borderWidth: 1, borderColor: 'transparent' },
   selectedElement: { borderColor: '#98cbf1', borderStyle: 'dashed' },
-  
+
   polaroidFrame: { backgroundColor: 'white', padding: 12, paddingBottom: 35, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 5, elevation: 5, transform: [{ rotate: '-2deg' }] },
   polaroidCaption: { position: 'absolute', bottom: 8, alignSelf: 'center', color: '#aaa', fontSize: 12 },
   highlighterDeco: { height: 22, borderRadius: 3, overflow: 'hidden', justifyContent: 'center' },
 
-  elementControls: { 
-    position: 'absolute', 
-    top: '100%', 
-    left: -10, 
+  elementControls: {
+    position: 'absolute',
+    top: '100%',
+    left: -10,
     right: -10,
-    bottom: -15, 
-    zIndex: 9999 
+    bottom: -15,
+    zIndex: 9999
   },
   controlCircleBtn: {
     backgroundColor: 'white',
@@ -739,11 +1118,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     shadowOffset: { width: 0, height: 1 },
-    position: 'absolute', 
+    position: 'absolute',
   },
   controlText: {
     fontFamily: 'Galmuri9',
-    fontSize: 12, 
+    fontSize: 12,
     includeFontPadding: false,
     textAlignVertical: 'center',
     color: '#333',
@@ -754,11 +1133,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     position: 'absolute',
     top: '100%',
-    left: '50%', 
-    marginLeft: -66, 
+    left: '50%',
+    marginLeft: -66,
     marginTop: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)', 
-    borderRadius: 14, 
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 14,
     padding: 4,
     gap: 6,
     elevation: 4,
@@ -779,48 +1158,48 @@ const styles = StyleSheet.create({
   },
   moveArrowText: {
     fontFamily: 'Galmuri9',
-    fontSize: 10, 
+    fontSize: 10,
     color: '#333',
     includeFontPadding: false,
     textAlignVertical: 'center'
   },
 
-  cornerConfirm: { 
-    top: -10, 
-    left: -10, 
-    backgroundColor: '#98cbf1', 
+  cornerConfirm: {
+    top: -10,
+    left: -10,
+    backgroundColor: '#98cbf1',
   },
-  cornerDelete: { 
-    top: -10, 
-    right: -10, 
-    backgroundColor: '#ff6b6b' 
+  cornerDelete: {
+    top: -10,
+    right: -10,
+    backgroundColor: '#ff6b6b'
   },
-  cornerResize: { 
-    bottom: -10, 
-    left: -10 
+  cornerResize: {
+    bottom: -10,
+    left: -10
   },
-  cornerShrink: { 
-    bottom: -10, 
-    right: -10 
+  cornerShrink: {
+    bottom: -10,
+    right: -10
   },
-  
+
   trayContainer: { backgroundColor: '#e8f5e9', paddingVertical: 15, paddingHorizontal: 10, borderTopWidth: 1, borderColor: '#eee' },
   trayTitle: { fontSize: 12, color: '#888', marginBottom: 10, paddingHorizontal: 10 },
   categoryRow: { flexDirection: 'row', paddingHorizontal: 10 },
-  
-  categoryBtn: { 
-    paddingHorizontal: 12, 
+
+  categoryBtn: {
+    paddingHorizontal: 12,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 15, 
-    backgroundColor: '#ffffff', 
-    marginRight: 8, 
-    borderWidth: 2, 
-    borderColor: '#eee' 
+    borderRadius: 15,
+    backgroundColor: '#ffffff',
+    marginRight: 8,
+    borderWidth: 2,
+    borderColor: '#eee'
   },
-  
-  activeCategoryBtn: { 
+
+  activeCategoryBtn: {
     borderColor: '#98cbf1'
   },
   categoryBtnText: {
@@ -832,23 +1211,23 @@ const styles = StyleSheet.create({
   },
 
   stickerItem: { marginHorizontal: 12, justifyContent: 'center', alignItems: 'center' },
-  
-  fontItem: { 
-    paddingHorizontal: 15, 
-    height: 40, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    backgroundColor: '#fff', 
-    borderRadius: 10, 
-    marginRight: 10, 
-    borderWidth: 2, 
+
+  fontItem: {
+    paddingHorizontal: 15,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    marginRight: 10,
+    borderWidth: 2,
     borderColor: '#eee'
   },
-  
-  selectedFontItem: { 
-    borderColor: '#98cbf1' 
+
+  selectedFontItem: {
+    borderColor: '#98cbf1'
   },
-  
+
   stickerTrayPreview: { width: 44, height: 44, resizeMode: 'contain' },
   hlPreviewColor: { width: 50, height: 22, borderRadius: 4, marginBottom: 5 },
   hlPreviewPattern: { width: 50, height: 22, borderRadius: 4, marginBottom: 5, resizeMode: 'cover' },
@@ -858,8 +1237,8 @@ const styles = StyleSheet.create({
   dakkuToolbar: { backgroundColor: 'white', paddingBottom: Platform.OS === 'ios' ? 30 : 15, paddingTop: 10, borderTopWidth: 1, borderColor: '#eee', zIndex: 1000 },
   bgSelector: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 10 },
   bgCircle: { width: 30, height: 30, borderRadius: 15, marginHorizontal: 5, borderWidth: 1, borderColor: '#ddd' },
-  gridPreview: { backgroundColor: '#ffffff', borderColor: '#ccc', borderWidth: 1, borderStyle: 'dashed' }, 
-  
+  gridPreview: { backgroundColor: '#ffffff', borderColor: '#ccc', borderWidth: 1, borderStyle: 'dashed' },
+
   toolButtons: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 10 },
   toolBtn: { paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#f5f5f5', borderRadius: 8, minWidth: 60, alignItems: 'center' },
   toolBtnText: { fontSize: 14, color: '#333', fontWeight: '600' },

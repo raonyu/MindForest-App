@@ -1,27 +1,29 @@
-"""주간 리포트용 스키마 추가 (1회 실행).
-
-- diaries.keywords 컬럼 추가 (상황·키워드 카드용)
-- bws_records 테이블 생성 (복합 감정 데이 카드용)
-
-기존 테이블은 건드리지 않으며, 여러 번 실행해도 안전하다.
-
-    python migrate_report_fields.py
-"""
-
-from sqlalchemy import text
-
+"""Add the merged diary fields without dropping existing data. Run explicitly before server startup."""
+from sqlalchemy import inspect, text
 import models
 from database import engine
 
 
-def main() -> None:
-    # 새 테이블(bws_records)은 create_all이 알아서 만든다. 기존 테이블은 변경하지 않는다.
+def main():
     models.Base.metadata.create_all(bind=engine)
-
+    existing = {c["name"] for c in inspect(engine).get_columns("diaries")}
+    columns = {
+        "keywords": "VARCHAR", "emotion_intensity": "INTEGER",
+        "secondary_emotion": "VARCHAR", "secondary_emotion_intensity": "INTEGER",
+        "analysis_status": "VARCHAR NOT NULL DEFAULT 'idle'",
+        "analysis_version": "INTEGER NOT NULL DEFAULT 0",
+        "confidence": "FLOAT", "bws_used": "BOOLEAN NOT NULL DEFAULT FALSE",
+        "analysis_completed_at": "TIMESTAMP", "analysis_error": "VARCHAR",
+        "analysis_requested_at": "TIMESTAMP",
+    }
     with engine.begin() as conn:
-        conn.execute(text("ALTER TABLE diaries ADD COLUMN IF NOT EXISTS keywords VARCHAR"))
-
-    print("✅ 마이그레이션 완료: diaries.keywords, bws_records")
+        for name, kind in columns.items():
+            if name not in existing:
+                conn.execute(text(f"ALTER TABLE diaries ADD COLUMN {name} {kind}"))
+        routine_columns = {c["name"] for c in inspect(conn).get_columns("user_routines")}
+        if "completed_at" not in routine_columns:
+            conn.execute(text("ALTER TABLE user_routines ADD COLUMN completed_at TIMESTAMP"))
+    print("Diary schema ready (existing records preserved).")
 
 
 if __name__ == "__main__":

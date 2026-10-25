@@ -20,6 +20,7 @@ export interface EmotionValue {
 
 export interface WeeklyReport {
     status: string;
+    personal_trend?: { data_status: string; baseline_deviation: number | null; sudden_drop_count: number; recovery_index: number | null };
     generated_at?: string;
     period?: { start: string; end: string; days: number };
     consistency?: { days_recorded: number; days_total: number };
@@ -322,7 +323,7 @@ const KeywordCard = ({ card }: { card?: ReportCard }) => {
                     <Text style={styles.subText}>{item.count}회</Text>
                 </View>
             ))}
-            <Note text={`기록 ${records}개에서 함께 나타난 상황과 감정이에요.`} />
+            <Note text={`기록 ${records}개에서 함께 나타난 상황과 감정이에요. ${card.data.note || ''}`} />
         </Card>
     );
 };
@@ -355,16 +356,27 @@ const BaselineCard = ({ card }: { card?: ReportCard }) => {
 const RoutineEffectCard = ({ card }: { card?: ReportCard }) => {
     if (!card?.data) return <Card title="루틴과 감정 변화" card={card} />;
 
-    const { items, baseline_average, baseline_days, note } = card.data;
+    const { items, paired_items = [], baseline_average, baseline_days, note, pending_records = 0 } = card.data;
 
     return (
         <Card title="루틴과 감정 변화" card={card}>
+            <Text style={styles.bodyText}>실제 완료 전후 관찰</Text>
+            {paired_items.length === 0 && <Text style={styles.subText}>완료 전후의 감정 기록이 아직 부족해요. 완료 직전과 이후의 감정을 기록해보세요.</Text>}
+            {paired_items.map((item: any, index: number) => (
+                <View key={`paired-${index}`} style={styles.routineRow}>
+                    <Text style={styles.routineName}>{item.routine}</Text>
+                    <Text style={styles.bodyText}>{item.before_average} → {item.after_average}점 ({item.signed_delta > 0 ? '+' : ''}{item.signed_delta}점)</Text>
+                    <Text style={styles.subText}>전후 관찰 {item.records}회{!item.enough ? ' · 기록 수집 중' : ''}{item.shared_records ? ` · 다른 루틴과 함께 수행 ${item.shared_records}회` : ''}</Text>
+                </View>
+            ))}
+            {pending_records > 0 && <Text style={styles.subText}>전후 비교를 기다리는 기록 {pending_records}개</Text>}
+            <Text style={styles.bodyText}>완료한 날과 완료하지 않은 날 비교</Text>
             {items.map((item: any, index: number) => (
                 <View key={index} style={styles.routineRow}>
                     <View style={styles.routineHead}>
-                        <Text style={styles.routineName}>{item.routine}</Text>
+                        <Text style={styles.routineName}>{item.rank ? `${item.rank}. ` : ''}{item.routine}</Text>
                         <Text style={[styles.routineDelta, { color: directionColor(item.direction) }]}>
-                            {directionMark(item.direction)} {item.delta}점
+                            {item.delta === null ? '비교 기록 부족' : `${directionMark(item.direction)} ${item.delta}점`}
                         </Text>
                     </View>
                     <Text style={styles.subText}>
@@ -373,7 +385,7 @@ const RoutineEffectCard = ({ card }: { card?: ReportCard }) => {
                     </Text>
                 </View>
             ))}
-            <Note text={`루틴이 없던 ${baseline_days}일 평균은 ${baseline_average}점이에요. ${note}`} />
+            <Note text={`완료하지 않은 ${baseline_days}일 평균: ${baseline_average === null ? '기록 수집 중' : `${baseline_average}점`}. ${note}`} />
         </Card>
     );
 };
@@ -396,6 +408,23 @@ const NextRoutineCard = ({ card }: { card?: ReportCard }) => {
 };
 
 const SectionTitle = ({ text }: { text: string }) => <Text style={styles.sectionTitle}>{text}</Text>;
+
+const SELF_EMOTION_LABELS: Record<string, string> = { joy: '기쁨', trust: '신뢰', fear: '불안', surprise: '놀람', sadness: '슬픔', disgust: '불쾌', anger: '분노', anticipation: '기대' };
+
+const SelfReportCard = ({ card }: { card?: ReportCard }) => {
+    if (!card?.data) return <Card title="내가 느낀 감정과 AI" card={card} />;
+    return <Card title="내가 느낀 감정과 AI" card={card}>
+        {card.data.items.map((item: any, index: number) => <View key={index} style={styles.routineRow}>
+            <Text style={styles.routineName}>{formatDate(item.date)}</Text>
+            {item.choices.map((choice: any) => <Text key={choice.emotion} style={styles.bodyText}>
+                내가 느낀 {SELF_EMOTION_LABELS[choice.emotion]} {choice.intensity}/5 · AI 상대점수 {choice.ai_score}/100
+            </Text>)}
+            <Text style={styles.subText}>AI 대표 감정: {SELF_EMOTION_LABELS[item.ai_dominant] || item.ai_dominant}</Text>
+            <Text style={styles.subText}>내부 환산 마음 온도: 자가보고 {item.self_temperature} · AI {item.ai_temperature} · 차이 {item.gap > 0 ? '+' : ''}{item.gap}점</Text>
+        </View>)}
+        <Note text={card.data.note} />
+    </Card>;
+};
 
 const ReportModal = ({ isVisible, data, onClose }: ReportModalProps) => {
     const cards = data?.cards;
@@ -433,8 +462,19 @@ const ReportModal = ({ isVisible, data, onClose }: ReportModalProps) => {
                             <SpectrumCard card={cards.spectrum} />
                             <TrendCard card={cards.trend} />
                             <SurveyCard card={cards.survey_trend} />
+                            <SelfReportCard card={cards.self_report} />
 
                             <SectionTitle text="상세 감정 분석" />
+                            {data?.personal_trend && (
+                                <View style={styles.card}>
+                                    <Text style={styles.sectionTitle}>개인 감정 추세</Text>
+                                    {data.personal_trend.data_status === 'ready' ? <>
+                                        <Text style={styles.bodyText}>평소 대비 마음 온도: {data.personal_trend.baseline_deviation ?? '—'}점</Text>
+                                        <Text style={styles.bodyText}>최근 급락 기록: {data.personal_trend.sudden_drop_count}회</Text>
+                                        <Text style={styles.subText}>회복 지수: {data.personal_trend.recovery_index ?? '기록 수집 중'}</Text>
+                                    </> : <Text style={styles.subText}>개인 기준선을 만들기 위해 기록을 모으고 있어요.</Text>}
+                                </View>
+                            )}
                             <BaselineCard card={cards.baseline} />
                             <CompositeCard card={cards.composite_days} />
                             <ResilienceCard card={cards.resilience} />

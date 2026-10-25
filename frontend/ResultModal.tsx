@@ -1,5 +1,6 @@
+import { notify } from './notify';
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, Dimensions, Alert } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useMainContext } from './MainContext';
 import { API_BASE_URL } from './config';
@@ -34,14 +35,14 @@ const ResultModal = ({ isVisible, data, onClose }: ResultModalProps) => {
         }
 
         if (!surveyType) {
-            Alert.alert("알림", "아직 진행할 수 있는 유형 설문조사가 없습니다.");
+            notify("알림", "아직 진행할 수 있는 유형 설문조사가 없습니다.");
             return;
         }
 
         try {
             const response = await fetch(`${API_BASE_URL}/api/survey/${surveyType}`);
             if (!response.ok) {
-                Alert.alert('설문 문항 불러오기 실패', '서버 오류');
+                notify('설문 문항 불러오기 실패', '서버 오류');
                 return;
             }
 
@@ -50,11 +51,11 @@ const ResultModal = ({ isVisible, data, onClose }: ResultModalProps) => {
                 onClose();
                 navigation.navigate("채팅", { surveyMode: true, surveyQuestions: surveyData, surveyType: surveyType });
             } else {
-                Alert.alert('알림', '가져올 설문 문항이 없습니다.');
+                notify('알림', '가져올 설문 문항이 없습니다.');
             }
         } catch (error) {
             console.error('설문 문항 불러오기 실패:', error);
-            Alert.alert('오류', '네트워크 연결을 확인해주세요.');
+            notify('오류', '네트워크 연결을 확인해주세요.');
         }
     };
 
@@ -67,10 +68,10 @@ const ResultModal = ({ isVisible, data, onClose }: ResultModalProps) => {
                         <Text style={styles.headerText}>분석 완료!</Text>
                         <Text style={styles.emojiText}>{data.result_emoji || '🌱'}</Text>
                     </View>
-                    
+
                     <View style={styles.detailContainer}>
                         <Text style={styles.subText}>당신의 마음 속 동물은</Text>
-                        <Text 
+                        <Text
                             style={styles.resultNameText}
                             numberOfLines={2}
                             adjustsFontSizeToFit={true}

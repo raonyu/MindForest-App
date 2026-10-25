@@ -26,10 +26,11 @@ THRESHOLD_FILE = MODEL_DIR / "thresholds.json"
 MAX_LENGTH = 256
 
 
-def load_thresholds() -> dict[str, float]:
+def load_thresholds(model_dir=None) -> dict[str, float]:
     """evaluate.py가 validation F1로 정한 감정별 임계값. 없으면 0.5."""
-    if THRESHOLD_FILE.exists():
-        with open(THRESHOLD_FILE, encoding="utf-8") as f:
+    threshold_file = Path(model_dir) / "thresholds.json" if model_dir else THRESHOLD_FILE
+    if threshold_file.exists():
+        with open(threshold_file, encoding="utf-8") as f:
             saved = json.load(f)
         return {emotion: float(saved.get(emotion, 0.5)) for emotion in EMOTIONS}
     return {emotion: 0.5 for emotion in EMOTIONS}
@@ -61,13 +62,16 @@ class EmotionClassifier:
         )
         self.model.to(self.device)
         self.model.eval()
-        self.thresholds = load_thresholds()
+        self.thresholds = load_thresholds(source)
         self.is_trained = source != BASE_MODEL
 
     @staticmethod
     def _resolve_source() -> str:
         # 학습 완료 모델이 있으면 그걸 쓰고, 없으면 미학습 베이스 모델로 폴백한다.
-        return str(MODEL_DIR) if (MODEL_DIR / "config.json").exists() else BASE_MODEL
+        source = Path(os.environ.get("MINDFOREST_MODEL_DIR", str(MODEL_DIR)))
+        if not any(source.glob("*.safetensors")) and not any(source.glob("pytorch_model*.bin")):
+            raise FileNotFoundError("학습된 감정 모델 파일이 없습니다. MINDFOREST_MODEL_DIR을 설정해주세요.")
+        return str(source)
 
     @torch.no_grad()
     def predict_proba(self, texts: list[str]) -> list[dict[str, float]]:

@@ -1,11 +1,12 @@
+import { notify } from './notify';
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  StyleSheet, View, Text, TouchableOpacity, Alert,
+  StyleSheet, View, Text, TouchableOpacity,
   TextInput, Platform, KeyboardAvoidingView, ScrollView, ImageBackground,
   Animated,
   Easing
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import { LinearGradient } from './Gradient';
 // import{ LinearGradient }from 'expo-linear-gradient';
 import { API_BASE_URL } from './config';
 
@@ -53,7 +54,7 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
 
   const startAuth = async () => {
     if (!inputId.trim() || !password.trim()) {
-      Alert.alert('안내', '아이디와 비밀번호를 모두 입력해주세요.');
+      notify('안내', '아이디와 비밀번호를 모두 입력해주세요.');
       return;
     }
 
@@ -69,7 +70,7 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        Alert.alert(authAction === 'login' ? '로그인 실패' : '회원가입 실패', errorData.detail || '다시 시도해주세요.');
+        notify(authAction === 'login' ? '로그인 실패' : '회원가입 실패', errorData.detail || '다시 시도해주세요.');
         setIsLoading(false);
         return;
       }
@@ -83,7 +84,7 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
         };
         onLoginSuccess(normalizedUser);
       } else {
-        Alert.alert('환영합니다! 🎉', '새로운 씨앗 등록이 완료되었습니다. 이제 숲으로 입장해주세요!', [
+        notify('환영합니다! 🎉', '새로운 씨앗 등록이 완료되었습니다. 이제 숲으로 입장해주세요!', [
           {
             text: '확인',
             onPress: () => {
@@ -95,7 +96,7 @@ const LoginScreen = ({ onLoginSuccess }: any) => {
       }
     } catch (error) {
       console.error('통신 실패:', error);
-      Alert.alert('서버 오류', '서버와 연결할 수 없습니다. 인터넷을 확인해주세요.');
+      notify('서버 오류', '서버와 연결할 수 없습니다. 인터넷을 확인해주세요.');
     } finally {
       setIsLoading(false);
     }

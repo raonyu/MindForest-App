@@ -10,7 +10,7 @@ import AngryEmoji from './assets/icons/AngryEmoji';
 // @ts-ignore
 import AnxiousEmoji from './assets/icons/AnxiousEmoji';
 // @ts-ignore
-import CryingEmoji from './assets/icons/CryingEmoji';
+
 // @ts-ignore
 import ExcitedEmoji from './assets/icons/ExcitedEmoji';
 // @ts-ignore
@@ -20,20 +20,16 @@ import GloomyEmoji from './assets/icons/GloomyEmoji';
 
 
 export const EMOTIONS = [
-  // 1번째 줄 (슬픔, 분노, 평온)
-  { id: 'sadness', color: '#FFB661', icon: SadEmoji },
-  { id: 'anger', color: '#FFD25E', icon: AngryEmoji },
-  { id: 'calm', color: '#64E671', icon: CalmEmoji },
-  
-  // 2번째 줄 (기쁨, 불안, 눈물)
-  { id: 'joy', color: '#FF5B5B', icon: JoyEmoji },
-  { id: 'anxiety', color: '#FF6187', icon: AnxiousEmoji },
-  { id: 'crying', color: '#E961FF', icon: CryingEmoji },
-  
-  // 3번째 줄 (신남, 평화, 우울)
-  { id: 'excited', color: '#56EACF', icon: ExcitedEmoji },
-  { id: 'peaceful', color: '#5B9CFF', icon: PeacefulEmoji },
-  { id: 'gloomy', color: '#8A5CFF', icon: GloomyEmoji },
+  // Plutchik 8감정
+  // 기존 아이콘 자산을 재사용하되 id/name은 분석 모델과 정확히 맞춘다.
+  { id: 'joy',          name: '기쁨', color: '#FF5B5B', icon: JoyEmoji },
+  { id: 'trust',        name: '신뢰', color: '#5B9CFF', icon: PeacefulEmoji },
+  { id: 'fear',         name: '공포', color: '#FF6187', icon: AnxiousEmoji },
+  { id: 'surprise',     name: '놀람', color: '#56EACF', icon: ExcitedEmoji },
+  { id: 'sadness',      name: '슬픔', color: '#FFB661', icon: SadEmoji },
+  { id: 'disgust',      name: '혐오', color: '#8A5CFF', icon: GloomyEmoji },
+  { id: 'anger',        name: '분노', color: '#FFD25E', icon: AngryEmoji },
+  { id: 'anticipation', name: '기대', color: '#64E671', icon: CalmEmoji },
 ];
 
 export const BACKGROUNDS = [
@@ -43,7 +39,7 @@ export const BACKGROUNDS = [
   { id: '#f0f8ff', color: '#f0f8ff', name: '스카이' },
   { id: '#e6e6fa', color: '#e6e6fa', name: '라벤더' },
   { id: '#e8f5e9', color: '#e8f5e9', name: '민트그린' },
-  { id: 'grid', color: '#ffffff', name: '모눈격자' }, 
+  { id: 'grid', color: '#ffffff', name: '모눈격자' },
 ];
 
 export const STICKER_CATEGORIES = {
@@ -267,7 +263,7 @@ export const STICKER_CATEGORIES = {
 };
 
 export const FONTS = [
-  { id: 'System', name: '기본체' }, 
+  { id: 'System', name: '기본체' },
   { id: 'NanumSquareRoundR', name: '나눔스퀘어' },
   { id: 'ownglyph', name: '오운글리프' },
   { id: 'MemomentKkukkukk', name: '꾹꾹체' }
@@ -281,7 +277,7 @@ export const HIGHLIGHTERS = [
   { id: 'pastel_blue', color: 'rgba(174, 198, 207, 0.55)', name: '파스텔블루', type: 'color' },
   { id: 'pastel_purple', color: 'rgba(221, 160, 221, 0.55)', name: '파스텔보라', type: 'color' },
   { id: 'pastel_mint', color: 'rgba(184, 242, 230, 0.55)', name: '파스텔민트', type: 'color' },
-  
+
   { id: 'dot1', texture: require('./assets/patterns/dot1.png'), name: '도트1', type: 'pattern', design: 'dot' },
   { id: 'dot2', texture: require('./assets/patterns/dot2.png'), name: '도트2', type: 'pattern', design: 'dot' },
   { id: 'dot3', texture: require('./assets/patterns/dot3.png'), name: '도트2', type: 'pattern', design: 'dot' },

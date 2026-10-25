@@ -50,10 +50,9 @@ def run_bws_llm(text: str, candidate_emotions: dict[str, int]) -> dict[str, Any]
         best = result.get("best_emotion")
         worst = result.get("worst_emotion")
 
-        if best not in emotion_names:
-            result["best_emotion"] = emotion_names[0]
-        if worst not in emotion_names or worst == result["best_emotion"]:
-            result["worst_emotion"] = emotion_names[-1]
+        if best not in emotion_names or worst not in emotion_names or best == worst:
+            # Invalid output is not successful verification; keep the first-stage result.
+            return None
 
         # 주간 리포트 BwsRecord 저장을 위해 후보 목록을 함께 담아 반환
         result["candidates"] = emotion_names

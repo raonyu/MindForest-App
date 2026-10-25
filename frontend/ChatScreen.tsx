@@ -1,13 +1,14 @@
-import React, { useEffect, useReducer, useRef } from 'react';
+import { notify } from './notify';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { useState } from 'react';
-import { useRoute, useNavigation, } from '@react-navigation/native';
-import { StyleSheet, View, Text, Button, TextInput, FlatList, ListRenderItem, Image, Keyboard, Platform, TouchableOpacity } from 'react-native';
-import { BottomBarProvider, useBottomBar } from './BottomBarContext';
+import { useRoute, useNavigation } from '@react-navigation/native';
+import { StyleSheet, View, Text, FlatList, ListRenderItem, Keyboard, Platform, TouchableOpacity } from 'react-native';
+import { useBottomBar } from './BottomBarContext';
 import ChatInput from './ChatInput';
 import SurveyInput from './SurveyInput';
 import { useIsFocused } from '@react-navigation/native';
-import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
-import { COLORS } from './assets/Maincolors';
+
+
 import ResultModal, { SurveyResult } from './ResultModal';
 import { useMainContext } from './MainContext';
 import { API_BASE_URL } from './config';
@@ -32,9 +33,7 @@ const MOCK_MESSAGES: Message[] = [
     {id: '3', text: `{"is_finished": true,"result_emoji": "🐢","result_name": "조용히 숨 고르는 거북이"}`, sender: 'ai', time: '오전 12:00'},
 ];
 */
-const MOCK_MESSAGES: Message[] = [
-  { id: '1', text: "상대방 매세지", sender: 'ai', time: '오전 10:00' }
-];
+
 
 // 흔하게 발생하는 챗봇의 JSON 생성 오류(마크다운, 잉여 괄호, 오탈자 등)를 복구하여 파싱하는 헬퍼 함수
 const parseRobustJSON = (text: string) => {
@@ -45,7 +44,7 @@ const parseRobustJSON = (text: string) => {
 
   try {
     return JSON.parse(cleanText);
-  } catch (e) {
+  } catch  {
     // 앞뒤 잉여 문자로 인한 오류일 경우, '{' 와 '}' 사이의 부분만 추출 시도
     const startIdx = cleanText.indexOf('{');
     let endIdx = cleanText.lastIndexOf('}');
@@ -54,7 +53,7 @@ const parseRobustJSON = (text: string) => {
       try {
         const candidate = cleanText.substring(startIdx, endIdx + 1);
         return JSON.parse(candidate);
-      } catch (err) {
+      } catch  {
         // 실패 시 그 전의 '}'를 찾아서 다시 시도
         endIdx = cleanText.lastIndexOf('}', endIdx - 1);
       }
@@ -89,7 +88,6 @@ const ChatScreen = () => {
   const flatListRef = useRef<FlatList<Message> | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState<number>(0);
   const [surveyResult, setSurveyResult] = useState<SurveyResult | null>(null);
-  const [inputText, setInputText] = useState<string>('');
   const [modalVisible, setModalVisible] = useState(false);
   const { user, setUser } = useMainContext();
   const isAtBottomRef = useRef(true);
@@ -110,7 +108,7 @@ const ChatScreen = () => {
       };
       fetchProfile();
     }
-  }, [user?.user_id, isFocused]);
+  }, [user?.user_id, user?.animal_category, user?.animal_emoji, isFocused, setUser]);
 
   const handleScroll = (event: any) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
@@ -130,6 +128,48 @@ const ChatScreen = () => {
   const [animalList, setAnimalList] = useState<any[]>([]);
 
   // 최초 진입 시 자동 메세지 전송 & 유형 설문조사 시작 확인
+  //백앤드 메세지 요청/응답 함수
+  const handleSendMessage = useCallback(async (inputText: string) => {
+    isAtBottomRef.current = true;
+    //유저 메세지 보내기
+    const userMsg: Message = {
+      id: Date.now().toString() + '_user',
+      text: inputText,
+      sender: 'user',
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    }
+    setMessages(prev => [...prev, userMsg]);
+    //백앤드로 메세지 보내고 응답 받기
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chatbot/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.user_id, message: inputText }),
+      });
+      console.log('보냈음', response);
+      //ai 응답 후 메세지 보내는 함수
+      const aiResponse = await response.json();
+      // aiResponse가 설문/결과 객체 자체인지 확인 (reply_message가 없는 경우 대비)
+      let replyText = aiResponse.reply_message;
+      if (!replyText && (aiResponse.type === 'select' || aiResponse.is_finished)) {
+        replyText = JSON.stringify(aiResponse);
+      }
+
+      const aimag: Message = {
+        id: Date.now().toString() + '_ai',
+        text: replyText || '응답을 받아오지 못했습니다.', // fallback text
+        sender: 'ai',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages(prev => [...prev, aimag]);
+    } catch (error) { console.error('응답 실패', error); }
+  }, [user?.user_id]);
+
+
+  //메세지 보내는 함수(메세지 데이터들에서 추가하는거)
+
+
+  // 자체 설문조사 모드 응답 처리기
   useEffect(() => {
     if (route.params?.initialMessage) {
       const msg = route.params.initialMessage;
@@ -189,7 +229,7 @@ const ChatScreen = () => {
             'Content-Type': 'application/json'
           }
         });
-        
+
         if (response.ok) {
           const data = await response.json();
           if (data && data.messages && data.messages.length > 0) {
@@ -209,10 +249,10 @@ const ChatScreen = () => {
             console.log("과거 대화 내역이 없습니다.");
           }
         } else {
-          Alert.alert("채팅 기록 불러오기 오류", `서버 상태 코드: ${response.status}\nURL: ${url}`);
+          notify("채팅 기록 불러오기 오류", `서버 상태 코드: ${response.status}\nURL: ${url}`);
         }
       } catch (e: any) {
-        Alert.alert("네트워크 통신 오류", `채팅 서버에 연결할 수 없습니다.\n${e.message}`);
+        notify("네트워크 통신 오류", `채팅 서버에 연결할 수 없습니다.\n${e.message}`);
         console.error("채팅 내역 불러오기 실패:", e);
       }
     };
@@ -220,60 +260,10 @@ const ChatScreen = () => {
       fetchChatHistory();
     }
 
-  }, [route.params?.initialMessage, route.params?.surveyMode, user?.user_id]);
-
-  //백앤드 메세지 요청/응답 함수
-  const handleSendMessage = async (inputText: string) => {
-    isAtBottomRef.current = true;
-    //유저 메세지 보내기
-    const userMsg: Message = {
-      id: Date.now().toString() + '_user',
-      text: inputText,
-      sender: 'user',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    }
-    setMessages(prev => [...prev, userMsg]);
-    //백앤드로 메세지 보내고 응답 받기
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/chatbot/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: user.user_id, message: inputText }),
-      });
-      console.log('보냈음', response);
-      //ai 응답 후 메세지 보내는 함수
-      const aiResponse = await response.json();
-      // aiResponse가 설문/결과 객체 자체인지 확인 (reply_message가 없는 경우 대비)
-      let replyText = aiResponse.reply_message;
-      if (!replyText && (aiResponse.type === 'select' || aiResponse.is_finished)) {
-        replyText = JSON.stringify(aiResponse);
-      }
-
-      const aimag: Message = {
-        id: Date.now().toString() + '_ai',
-        text: replyText || '응답을 받아오지 못했습니다.', // fallback text
-        sender: 'ai',
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      setMessages(prev => [...prev, aimag]);
-    } catch (error) { console.error('응답 실패', error); }
-  }
+  }, [route.params?.initialMessage, route.params?.surveyMode, route.params?.surveyQuestions, route.params?.surveyType, user?.user_id, navigation, handleSendMessage]);
 
 
-  //메세지 보내는 함수(메세지 데이터들에서 추가하는거)
-  const sendMessages = (inputText: string) => {
-    const newMessage: Message = {
-      id: Date.now().toString() + '_manual',
-      text: inputText,
-      sender: 'user',
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-    setMessages(prevMessages => [...prevMessages, newMessage]);
-
-  };
-
-  // 자체 설문조사 모드 응답 처리기
-  const handleSurveyAnswer = async (value: string) => {
+  const handleSurveyAnswer = useCallback(async (value: string) => {
     // 1. 유저 선택지를 화면에 표시
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -348,22 +338,22 @@ const ChatScreen = () => {
         console.error("설문 제출 오류", err);
       }
     }
-  };
+  }, [surveyQuestions, surveyAnswers, currentQuestionIndex, surveyType, user?.user_id]);
 
   //설문데이터인지 판별하는 함수
-  const getsurveyData = () => {
+  const getsurveyData = useCallback(() => {
     if (!lastMessage || lastMessage.sender !== `ai` || !lastMessage.text) return null;
     try {
       const aiJsonData = parseRobustJSON(lastMessage.text);
       if (aiJsonData && aiJsonData.type === 'select') {
         return { title: aiJsonData.title, detail: aiJsonData.detail };
       }
-    } catch (error) {
+    } catch  {
       // 일반 텍스트이거나 JSON 파싱 실패인 경우
       return null;
     }
     return null;
-  };
+  }, [lastMessage]);
 
 
   //설문조사 데이터, 결과 등의 데이터 여부에 따라 이벤트 처리
@@ -394,7 +384,7 @@ const ChatScreen = () => {
               console.log('결과 데이터 파싱 성공', parsedData);
               setBottomBarContent(<ChatInput onSend={(inputText) => { handleSendMessage(inputText); }} />);
             }
-          } catch (error) {
+          } catch  {
             // 일반 텍스트
           }
         }
@@ -417,7 +407,7 @@ const ChatScreen = () => {
       //다른 화면으로 전환 시 하단바 초기화
       return () => setBottomBarContent(null);
     }
-  }, [isFocused, messages]);//포커싱, 메세지 데이터 여부에 따라 재랜더링
+  }, [isFocused, getsurveyData, handleSendMessage, handleSurveyAnswer, lastMessage, setBottomBarContent, surveyMode]);
 
   // 키보드 이벤트: 키보드가 열리면 FlatList가 위로 올라가도록 패딩 조정
   useEffect(() => {
@@ -443,7 +433,7 @@ const ChatScreen = () => {
       try {
         // @ts-ignore
         flatListRef.current.scrollToEnd({ animated: true });
-      } catch (e) {/* ignore */ }
+      } catch  {/* ignore */ }
     });
     return () => showSub.remove();
   }, []);
@@ -454,7 +444,7 @@ const ChatScreen = () => {
       try {
         // @ts-ignore
         flatListRef.current.scrollToEnd({ animated: true });
-      } catch (e) {/* ignore */ }
+      } catch  {/* ignore */ }
     }
   }, [messages, keyboardHeight]);
 
@@ -468,7 +458,7 @@ const ChatScreen = () => {
         if (parsedData && (parsedData.type === 'select' || parsedData.is_finished === true)) {
           surveyData = parsedData;
         }
-      } catch (error) {
+      } catch  {
         // 일반 텍스트
       }
     }

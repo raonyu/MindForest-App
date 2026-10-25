@@ -89,3 +89,7 @@ backend/node_modules/
 *.pt
 *.pth
 backend/emotion_model/model/model.safetensors
+# Local integration runtime
+.local/
+frontend/dist/
+frontend/.expo/
